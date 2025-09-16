@@ -1,92 +1,66 @@
-<script>
-(() => {
-  // Konfiguration
-  const START_HOUR = 8;
-  const NUM_HOURS  = 14; // 08:00..21:00 (inkl.)
+/* wu-cal-loader.js – DEV-Loader mit sichtbarem Badge & Cache-Bust */
+(function () {
+  // === Konfiguration ===
+  const CORE_URL = "https://cdn.jsdelivr.net/gh/twinibam-tech/wu-cal-custom@main/wu-cal-custom.js";
+  const BADGE_ID = "wu-dev-badge";
+  const BTN_ID = "wu-dev-reload-btn";
 
-  // Selektoren (ggf. anpassen, aber so passt es zum Screenshot/CSS)
-  const GRID_SEL    = '.chadmo-gridsView';
-  const HEADER_SEL  = '.header-columns .header-column .mergedHeaderContent';
-  const TAB_SEL     = '[role="tab"], button, a';
-
-  // Hilfsfunktionen
-  const isDayViewActive = () => {
-    // robust: schaue nach einem aktiven Tab, dessen Text "Tag" enthält
-    const activeTab = document.querySelector(`${TAB_SEL}[aria-selected="true"]`)
-                    || document.querySelector(`${TAB_SEL}.active`);
-    return !!activeTab && /(^|\s)tag(\s|$)/i.test(activeTab.textContent.trim());
-  };
-
-  const labelForIndex = (i /* 1-based für Stunden-Spalten */) => {
-    const hour = START_HOUR + (i - 1);
-    return `${String(hour).padStart(2, '0')}:00`;
-  };
-
-  const relabelHeaders = () => {
-    const grid = document.querySelector(GRID_SEL);
-    if (!grid) return;
-
-    const headers = grid.querySelectorAll(HEADER_SEL);
-    if (!headers.length) return;
-
-    // Spalte 1 ist "SPACE" -> unangetastet lassen
-    if (isDayViewActive()) {
-      for (let i = 1; i <= NUM_HOURS && i < headers.length; i++) {
-        const el = headers[i]; // 0 = SPACE, 1.. = Stunden
-        if (!el.dataset.originalText) {
-          el.dataset.originalText = el.textContent.trim();
-        }
-        el.textContent = labelForIndex(i);
-        el.dataset.jsLabeled = '1';
-      }
-    } else {
-      // Alte Labels wiederherstellen, wenn wir nicht in der Tag-Ansicht sind
-      headers.forEach((el, idx) => {
-        if (idx === 0) return;
-        if (el.dataset.jsLabeled && el.dataset.originalText) {
-          el.textContent = el.dataset.originalText;
-        }
-        delete el.dataset.jsLabeled;
-      });
+  // === Badge einfügen (sichtbar auf der Seite) ===
+  const style = document.createElement("style");
+  style.textContent = `
+    #${BADGE_ID}{
+      position:fixed; right:12px; bottom:12px; z-index:999999;
+      font:12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:#111; color:#fff; border-radius:8px; padding:10px 12px; box-shadow:0 4px 16px rgba(0,0,0,.3);
+      max-width:280px
     }
-  };
+    #${BADGE_ID} b{font-weight:600}
+    #${BADGE_ID} code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+    #${BTN_ID}{
+      display:inline-block; margin-top:8px; padding:6px 10px; border-radius:6px;
+      background:#2d7ef7; color:#fff; border:none; cursor:pointer
+    }
+  `;
+  document.head.appendChild(style);
 
-  // Observer, um auf DOM-Änderungen zu reagieren (Navigation, Filter, Datum)
-  let mo = null;
-  const ensureObserver = () => {
-    const grid = document.querySelector(GRID_SEL);
-    if (!grid || mo) return;
-    mo = new MutationObserver(() => relabelHeaders());
-    mo.observe(grid, { childList: true, subtree: true });
-  };
+  const badge = document.createElement("div");
+  badge.id = BADGE_ID;
+  badge.innerHTML = `
+    <div><b>WU Custom JS (DEV)</b></div>
+    <div>Quelle: <code id="wu-core-src">-</code></div>
+    <div>Geladen: <span id="wu-loaded-at">-</span></div>
+    <button id="${BTN_ID}" type="button">Core neu laden</button>
+  `;
+  document.documentElement.appendChild(badge);
 
-  // Tabs-Klicks abfangen (Wechsel Tag/Woche/Monat)
-  const wireTabClicks = () => {
-    document.querySelectorAll(TAB_SEL).forEach(btn => {
-      if (btn.dataset.jsWired) return;
-      btn.dataset.jsWired = '1';
-      btn.addEventListener('click', () => {
-        // kleine Verzögerung, bis der View gewechselt hat
-        setTimeout(relabelHeaders, 0);
-      });
-    });
-  };
+  const srcEl = badge.querySelector("#wu-core-src");
+  const tsEl  = badge.querySelector("#wu-loaded-at");
+  const btn   = badge.querySelector("#" + BTN_ID);
 
-  // Initial
-  const boot = () => {
-    ensureObserver();
-    wireTabClicks();
-    relabelHeaders();
-  };
+  function format(ts){ return new Date(ts).toLocaleString(); }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
+  function loadCore(bust) {
+    const v = bust || Date.now();               // Cache-Bust
+    const url = CORE_URL + (CORE_URL.includes("?") ? "&" : "?") + "v=" + v;
+
+    // Anzeige aktualisieren
+    srcEl.textContent = url;
+    tsEl.textContent = format(Date.now());
+
+    // Script injizieren (synchron, damit dein Core sofort läuft)
+    const s = document.createElement("script");
+    s.src = url;
+    s.async = false;
+    document.head.appendChild(s);
   }
 
-  // Optional: bei Window-Focus/Resize ebenfalls nachziehen
-  window.addEventListener('focus', relabelHeaders);
-  window.addEventListener('resize', relabelHeaders);
+  btn.addEventListener("click", () => loadCore(Date.now()));
+
+  // Beim ersten Laden direkt frische Core holen
+  loadCore(Date.now());
+
+  // Optional: Hook für deinen Core, um eigene Infos zurückzumelden
+  window.WU_DEV_LOADER = {
+    setInfo(text){ tsEl.textContent = text; }
+  };
 })();
-</script>
