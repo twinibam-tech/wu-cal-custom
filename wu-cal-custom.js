@@ -1,178 +1,179 @@
-/* wu-cal-custom.js – WU customizations
-   - "SPACE" -> "Raumverfügbarkeiten"
-   - Zeitlabels nur in Tag-Ansicht
-   - Popup bei Klick auf belegte (graue) Slots
-   - Idempotent + robust via MutationObserver
-*/
+@@ -1,11 +1,169 @@
+(function(){
+  const box = document.createElement("div");
+  box.textContent = "✅ NEUES SCRIPT GELADEN " + new Date().toLocaleTimeString();
+  box.style.cssText = `
+    position:fixed; top:60px; right:20px; z-index:99999;
+    background:#e91e63; color:white; padding:10px 14px; 
+    font:bold 14px/1.4 sans-serif; border-radius:6px;
+    box-shadow:0 2px 8px rgba(0,0,0,.3);
+/* wu-cal-custom.js – CSS-Injection + sichtbarer Badge */
 (function () {
-  // ===== Konfiguration / Selektoren (ggf. anpassen) =====
-  const GRID_SEL      = ".chadmo-gridsView";
-  const HEADER_COLS   = ".header-columns .header-column";
-  const HEADER_LABEL  = ".mergedHeaderContent";
-  const TAB_SEL       = '[role="tab"], button, a';
+  const STYLE_ID = "wu-inline-css";
+  const BADGE_ID = "wu-inline-badge";
 
-  // Mögliche Klassen/Marker für belegte Slots (grau)
-  const OCCUPIED_SEL =
-    [
-      // häufige Namen in Buchungs-UI
-      ".occupied", ".booked", ".busy", ".blocked", ".unavailable", ".not-available", ".disabled",
-      // generisch in Momentus-Grids
-      ".reservation", ".reservation-blocked", ".grid-cell-disabled",
-    ].join(",");
+  // === CSS aus deiner Vorgabe ===
+  const CSS = `
+/* ===== Header Logo (smaller, moved inward, responsive) ===== */
+.usi-gradientbackground{
+  position: relative;
+  /* leave room so the H1 never collides with the logo */
+  padding-right: clamp(120px, 12vw, 220px) !important;
+}
 
-  // ===== Utils =====
-  function isDayViewActive() {
-    // Suche nach einem aktiven Tab mit Text "Tag"
-    const activeTab =
-      document.querySelector(`${TAB_SEL}[aria-selected="true"]`) ||
-      document.querySelector(`${TAB_SEL}.active`);
-    return !!activeTab && /(^|[\s|])tag([\s|]|$)/i.test(activeTab.textContent.trim());
+/* White WU logo drawn via mask */
+.usi-gradientbackground::after{
+  content: "";
+  position: absolute;
+
+  /* place it a bit away from the right edge */
+  right: clamp(28px, 4vw, 56px);
+
+  /* vertically centered with a tiny optical lift */
+  top: 50%;
+  transform: translateY(-48%);
+
+  /* responsive size: small on narrow screens, capped on wide */
+  height: clamp(56px, 7.5vw, 96px);
+  aspect-ratio: 16 / 9;                   /* keeps proportion */
+
+  /* use your PNG as a mask so it renders white */
+  -webkit-mask-image: url("https://www.wu.ac.at/typo3temp/assets/_processed_/0/a/csm_news_fallback_lg_692ea2c9f7.png");
+  mask-image: url("https://www.wu.ac.at/typo3temp/assets/_processed_/0/a/csm_news_fallback_lg_692ea2c9f7.png");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  background-color: #fff;
+
+  opacity: .95;
+  pointer-events: none;
+  z-index: 0; /* under the white search card */
+}
+
+/* Fallback if mask unsupported (keeps it white) */
+@supports not (-webkit-mask-image: url("")) {
+  .usi-gradientbackground::after{
+    background-image: url("https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Logo_Wirtschaftsuniversit%C3%A4t_Wien.svg/251px-Logo_Wirtschaftsuniversit%C3%A4t_Wien.svg.png");
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+    filter: brightness(0) invert(1);
+  }
+}
+
+/* Tighten spacing & size a bit on medium widths */
+@media (max-width: 1200px){
+  .usi-gradientbackground{
+    padding-right: clamp(110px, 10vw, 180px) !important;
+  }
+  .usi-gradientbackground::after{
+    right: clamp(20px, 3vw, 40px);
+    height: clamp(48px, 6.5vw, 84px);
+  }
+}
+
+/* Hide the decorative logo on small screens */
+@media (max-width: 600px){
+  .usi-gradientbackground::after{ display:none; }
+}
+
+
+/* ===== Desktop/Tablet: Zeit-Labels im Grid ersetzen ===== */
+.chadmo-gridsView .header-columns .header-column .mergedHeaderContent{font-size:0!important;}
+.chadmo-gridsView .header-columns .header-column .mergedHeaderContent::before{font-size:16px!important;line-height:1;display:inline-block;}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(2)  .mergedHeaderContent::before{content:"08:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(3)  .mergedHeaderContent::before{content:"09:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(4)  .mergedHeaderContent::before{content:"10:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(5)  .mergedHeaderContent::before{content:"11:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(6)  .mergedHeaderContent::before{content:"12:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(7)  .mergedHeaderContent::before{content:"13:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(8)  .mergedHeaderContent::before{content:"14:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(9)  .mergedHeaderContent::before{content:"15:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(10) .mergedHeaderContent::before{content:"16:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(11) .mergedHeaderContent::before{content:"17:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(12) .mergedHeaderContent::before{content:"18:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(13) .mergedHeaderContent::before{content:"19:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(14) .mergedHeaderContent::before{content:"20:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(15) .mergedHeaderContent::before{content:"21:00";}
+
+/* ===== Mobile: ✓ vor jeder vorhandenen Zeitzeile ===== */
+@media screen and (max-width: 768px), (hover:none) and (pointer:coarse){
+
+  /* kurzer Hinweis über dem Kalender (falls gewünscht) */
+  .usi-calendarHeader::before{
+    content:"✓ Verfügbar = Raum ist im angegebenen Zeitfenster frei.";
+    display:block; margin:12px 0 10px; padding:6px 10px;
+    font-size:13px; font-weight:600; color:#1b5e20;
+    background:#e8f5e9; border:1px solid #b7e1c0; border-radius:6px;
   }
 
-  function relabelSpaceHeader(grid) {
-    // Erste Spalte ist die Räume-Spalte
-    const firstHeader = grid.querySelector(`${HEADER_COLS}:first-of-type ${HEADER_LABEL}`) ||
-                        grid.querySelector(`${HEADER_COLS}:first-of-type`);
-    if (firstHeader && firstHeader.textContent.trim() !== "Raumverfügbarkeiten") {
-      firstHeader.textContent = "Raumverfügbarkeiten";
+  /* Zeitzeilen stehen als .ng-star-inserted NACH dem Raumnamen – dort ein ✓ davor */
+  app-calendar-mobile-view
+  .usi-calendarDisplayMobile_description ~ .ng-star-inserted:not(.usi-calendarDisplayMobile_container):not(:empty){
+    display:flex; align-items:center; gap:6px;
+  }
+  app-calendar-mobile-view
+  .usi-calendarDisplayMobile_description ~ .ng-star-inserted:not(.usi-calendarDisplayMobile_container):not(:empty)::before{
+    content:"✓"; color:#2e7d32; font-weight:800; display:inline-block; min-width:1em;
+  }
+
+  /* Fallback: falls Zeiten doch innerhalb eines Containers stehen */
+  app-calendar-mobile-view
+  .usi-calendarDisplayMobile_container .ng-star-inserted:not(:empty){
+    display:flex; align-items:center; gap:6px;
+  }
+  app-calendar-mobile-view
+  .usi-calendarDisplayMobile_container .ng-star-inserted:not(:empty)::before{
+    content:"✓"; color:#2e7d32; font-weight:800; display:inline-block; min-width:1em;
+  }
+}
+  `;
+  document.body.appendChild(box);
+
+  // === Style nur einmal injizieren ===
+  function injectStyle() {
+    if (!document.getElementById(STYLE_ID)) {
+      const style = document.createElement("style");
+      style.id = STYLE_ID;
+      style.textContent = CSS;
+      document.head.appendChild(style);
     }
   }
 
-  function relabelTimeHeadersIfDay(grid) {
-    if (!isDayViewActive()) return; // nur im "Tag"-Tab
-
-    const headers = grid.querySelectorAll(HEADER_COLS);
-    if (!headers || headers.length === 0) return;
-
-    // In deinem Setup: ab Spalte 2 = 08:00 bis Spalte 15 = 21:00
-    const START_HOUR = 8;
-    const NUM_HOURS  = 14; // 08..21 inkl.
-    for (let i = 0; i < NUM_HOURS; i++) {
-      const hour = START_HOUR + i;
-      const colIndex = 2 + i; // 1 = Räume, ab 2 beginnen Stunden
-      const cell = grid.querySelector(
-        `${HEADER_COLS}:nth-of-type(${colIndex}) ${HEADER_LABEL}`
-      ) || grid.querySelector(`${HEADER_COLS}:nth-of-type(${colIndex})`);
-      if (cell) cell.textContent = `${String(hour).padStart(2, "0")}:00`;
-    }
-  }
-
-  // Kleines Popup rechts/oben der Klickposition
-  const POP_ID = "wu-occupied-popup";
-  function showOccupiedPopup(x, y, text) {
-    let el = document.getElementById(POP_ID);
-    if (!el) {
-      el = document.createElement("div");
-      el.id = POP_ID;
-      Object.assign(el.style, {
-        position: "fixed",
-        zIndex: 999999,
-        background: "#263238",
-        color: "#fff",
-        padding: "8px 10px",
-        borderRadius: "6px",
-        boxShadow: "0 4px 14px rgba(0,0,0,.25)",
-        font: "13px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-        maxWidth: "260px",
-        pointerEvents: "none",
-        opacity: "0",
-        transition: "opacity .15s ease"
-      });
-      document.body.appendChild(el);
-    }
-    el.textContent = text;
-    // Position mit kleinem Offset
-    el.style.left = Math.max(8, x + 12) + "px";
-    el.style.top  = Math.max(8, y + 12) + "px";
-    // ein-/ausblenden
-    requestAnimationFrame(() => (el.style.opacity = "1"));
-    clearTimeout(el._t);
-    el._t = setTimeout(() => {
-      el.style.opacity = "0";
-      // nach dem Faden lassen wir’s stehen (kann wiederverwendet werden)
-    }, 1600);
-  }
-
-  // Fallback-Check: ist ein Element „grau“? (nur als letztes Mittel)
-  function isGreyish(el) {
-    const cs = getComputedStyle(el);
-    const bg = cs.backgroundColor || "";
-    // sehr einfache Heuristik: grau hat r≈g≈b und nicht transparent/weiß
-    const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-    if (!m) return false;
-    const [r, g, b] = [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])];
-    const diffRG = Math.abs(r - g);
-    const diffGB = Math.abs(g - b);
-    const diffRB = Math.abs(r - b);
-    const isNearEqual = diffRG < 12 && diffGB < 12 && diffRB < 12;
-    const isNotWhite = (r + g + b) / 3 < 245;
-    return isNearEqual && isNotWhite;
-  }
-
-  function handleOccupiedClicks(grid) {
-    // Delegation: wir reagieren nur auf belegte Slots
-    grid.addEventListener("click", (ev) => {
-      const t = ev.target;
-      if (!t) return;
-
-      // 1) offensichtliche Klassen/Marker
-      let cell = t.closest(OCCUPIED_SEL);
-      // 2) häufiges Pattern: deaktivierte/blocked Zellen
-      if (!cell) cell = t.closest('[aria-disabled="true"], .disabled, .is-disabled');
-      // 3) Heuristik: graue Zellen im Raster
-      if (!cell) {
-        const maybe = t.closest(`${GRID_SEL} *`);
-        if (maybe && isGreyish(maybe)) cell = maybe;
-      }
-
-      if (cell) {
-        showOccupiedPopup(ev.clientX, ev.clientY, "Hier ist bereits belegt.");
-      }
-    }, { passive: true });
-  }
-
-  // Sichtbares Badge, um zu erkennen, dass diese Version aktiv ist
-  function showOnceBadge() {
-    if (document.getElementById("wu-badge")) return;
+  // === Sichtbarer Badge (zeigt, dass DIESE Datei aktiv ist) ===
+  function showBadge() {
+    if (document.getElementById(BADGE_ID)) return;
     const b = document.createElement("div");
-    b.id = "wu-badge";
-    b.textContent = "✅ Script aktiv – " + new Date().toLocaleTimeString();
+    b.id = BADGE_ID;
+    b.textContent = "✅ NEUES SCRIPT AKTIV – " + new Date().toLocaleTimeString();
     Object.assign(b.style, {
       position: "fixed", top: "12px", right: "12px", zIndex: 999999,
-      background: "#1b5e20", color: "#fff", padding: "8px 10px",
-      borderRadius: "6px", boxShadow: "0 2px 8px rgba(0,0,0,.15)",
-      font: "14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif"
+      padding: "8px 10px",
+      font: "14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+      background: "#1b5e20", color: "#fff", borderRadius: "6px",
+      boxShadow: "0 2px 8px rgba(0,0,0,.15)"
     });
     document.documentElement.appendChild(b);
-    setTimeout(() => b.remove(), 5000);
+    setTimeout(() => b.remove(), 6000);
   }
 
-  // Haupt-Anwendung
+  // === Initial & robust bei SPA-Änderungen (MutationObserver) ===
   function applyAll() {
-    const grid = document.querySelector(GRID_SEL);
-    if (!grid) return;
-
-    relabelSpaceHeader(grid);          // immer
-    relabelTimeHeadersIfDay(grid);     // nur im Tag-Tab
-    handleOccupiedClicks(grid);        // einmal Listener setzen
+    injectStyle();
+    showBadge();
   }
 
-  // Initial laden
-  const run = () => { showOnceBadge(); applyAll(); };
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", run);
+    document.addEventListener("DOMContentLoaded", applyAll);
   } else {
-    run();
+    applyAll();
   }
 
-  // SPA/DOM-Änderungen beobachten und sanft re-applien
-  const mo = new MutationObserver(() => {
-    const grid = document.querySelector(GRID_SEL);
-    if (!grid) return;
-    // nur schnelle Re-Applies, idempotent
-    relabelSpaceHeader(grid);
-    relabelTimeHeadersIfDay(grid);
-  });
-  mo.observe(document.documentElement, { subtree: true, childList: true });
-
+  // Falls DOM neu gerendert wird (Angular/SPA), bleibt der Style bestehen;
+  // der Badge wird nur beim ersten Mal gezeigt, Style ist idempotent.
+  const mo = new MutationObserver(() => injectStyle());
+  mo.observe(document.documentElement, {subtree: true, childList: true});
 })();
