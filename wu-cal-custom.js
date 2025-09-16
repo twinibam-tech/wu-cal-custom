@@ -3,7 +3,7 @@
   const STYLE_ID = "wu-inline-css";
   const BADGE_ID = "wu-inline-badge";
 
-  // === CSS aus deiner Vorgabe ===
+  // === CSS aus deiner Vorgabe + SPACE-Umbenennung ===
   const CSS = `
 /* ===== Header Logo (smaller, moved inward, responsive) ===== */
 .usi-gradientbackground{
@@ -26,9 +26,8 @@
 
   /* responsive size: small on narrow screens, capped on wide */
   height: clamp(56px, 7.5vw, 96px);
-  aspect-ratio: 16 / 9;                   /* keeps proportion */
+  aspect-ratio: 16 / 9;
 
-  /* use your PNG as a mask so it renders white */
   -webkit-mask-image: url("https://www.wu.ac.at/typo3temp/assets/_processed_/0/a/csm_news_fallback_lg_692ea2c9f7.png");
   mask-image: url("https://www.wu.ac.at/typo3temp/assets/_processed_/0/a/csm_news_fallback_lg_692ea2c9f7.png");
   -webkit-mask-repeat: no-repeat;
@@ -41,7 +40,7 @@
 
   opacity: .95;
   pointer-events: none;
-  z-index: 0; /* under the white search card */
+  z-index: 0;
 }
 
 /* Fallback if mask unsupported (keeps it white) */
@@ -55,7 +54,6 @@
   }
 }
 
-/* Tighten spacing & size a bit on medium widths */
 @media (max-width: 1200px){
   .usi-gradientbackground{
     padding-right: clamp(110px, 10vw, 180px) !important;
@@ -66,11 +64,9 @@
   }
 }
 
-/* Hide the decorative logo on small screens */
 @media (max-width: 600px){
   .usi-gradientbackground::after{ display:none; }
 }
-
 
 /* ===== Desktop/Tablet: Zeit-Labels im Grid ersetzen ===== */
 .chadmo-gridsView .header-columns .header-column .mergedHeaderContent{font-size:0!important;}
@@ -90,18 +86,20 @@
 .chadmo-gridsView .header-columns .header-column:nth-of-type(14) .mergedHeaderContent::before{content:"20:00";}
 .chadmo-gridsView .header-columns .header-column:nth-of-type(15) .mergedHeaderContent::before{content:"21:00";}
 
+/* ===== SPACE -> Verfügbarkeiten (nur 1. Spalte) ===== */
+.chadmo-gridsView .header-columns .header-column:first-of-type .mergedHeaderContent::before{
+  content:"Verfügbarkeiten";
+  font-size:14px!important; line-height:1; display:inline-block;
+}
+
 /* ===== Mobile: ✓ vor jeder vorhandenen Zeitzeile ===== */
 @media screen and (max-width: 768px), (hover:none) and (pointer:coarse){
-
-  /* kurzer Hinweis über dem Kalender (falls gewünscht) */
   .usi-calendarHeader::before{
     content:"✓ Verfügbar = Raum ist im angegebenen Zeitfenster frei.";
     display:block; margin:12px 0 10px; padding:6px 10px;
     font-size:13px; font-weight:600; color:#1b5e20;
     background:#e8f5e9; border:1px solid #b7e1c0; border-radius:6px;
   }
-
-  /* Zeitzeilen stehen als .ng-star-inserted NACH dem Raumnamen – dort ein ✓ davor */
   app-calendar-mobile-view
   .usi-calendarDisplayMobile_description ~ .ng-star-inserted:not(.usi-calendarDisplayMobile_container):not(:empty){
     display:flex; align-items:center; gap:6px;
@@ -110,8 +108,6 @@
   .usi-calendarDisplayMobile_description ~ .ng-star-inserted:not(.usi-calendarDisplayMobile_container):not(:empty)::before{
     content:"✓"; color:#2e7d32; font-weight:800; display:inline-block; min-width:1em;
   }
-
-  /* Fallback: falls Zeiten doch innerhalb eines Containers stehen */
   app-calendar-mobile-view
   .usi-calendarDisplayMobile_container .ng-star-inserted:not(:empty){
     display:flex; align-items:center; gap:6px;
@@ -123,7 +119,6 @@
 }
   `;
 
-  // === Style nur einmal injizieren ===
   function injectStyle() {
     if (!document.getElementById(STYLE_ID)) {
       const style = document.createElement("style");
@@ -133,7 +128,6 @@
     }
   }
 
-  // === Sichtbarer Badge (zeigt, dass DIESE Datei aktiv ist) ===
   function showBadge() {
     if (document.getElementById(BADGE_ID)) return;
     const b = document.createElement("div");
@@ -150,11 +144,7 @@
     setTimeout(() => b.remove(), 6000);
   }
 
-  // === Initial & robust bei SPA-Änderungen (MutationObserver) ===
-  function applyAll() {
-    injectStyle();
-    showBadge();
-  }
+  function applyAll() { injectStyle(); showBadge(); }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", applyAll);
@@ -162,8 +152,6 @@
     applyAll();
   }
 
-  // Falls DOM neu gerendert wird (Angular/SPA), bleibt der Style bestehen;
-  // der Badge wird nur beim ersten Mal gezeigt, Style ist idempotent.
-  const mo = new MutationObserver(() => injectStyle());
-  mo.observe(document.documentElement, {subtree: true, childList: true});
+  new MutationObserver(() => injectStyle())
+    .observe(document.documentElement, {subtree:true, childList:true});
 })();
