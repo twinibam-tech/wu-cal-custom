@@ -132,7 +132,7 @@
     if (document.getElementById(BADGE_ID)) return;
     const b = document.createElement("div");
     b.id = BADGE_ID;
-    b.textContent = "✅ NEUES SCRIPT AKTIV – " + new Date().toLocaleTimeString();
+    b.textContent = "✅ SPACE SCRIPT AKTIV – " + new Date().toLocaleTimeString();
     Object.assign(b.style, {
       position: "fixed", top: "12px", right: "12px", zIndex: 999999,
       padding: "8px 10px",
