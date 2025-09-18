@@ -148,13 +148,14 @@
 
 /* ===========================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
-   V7: exakte Zeit inkl. rechter Rand (21–22), robustes X-Clamping
+   V9: Zeiten über Row-Grenzen (id="0..n") + Fallback Header + rote Sternchen
    =========================================================================== */
 (function () {
-  const STYLE_ID   = "wu-unavail-v7-style";
+  const STYLE_ID   = "wu-unavail-v9-style";
   const POPOVER_ID = "wu-unavail-popover";
 
   const CSS = `
+/* Popover */
 #${POPOVER_ID}-backdrop{ position:fixed; inset:0; background:rgba(10,14,19,.25);
   -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
   opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:999998; }
@@ -165,7 +166,6 @@
   transform:scale(.96) translateY(-2px); opacity:0; pointer-events:none;
   transition:transform .18s cubic-bezier(.2,.7,.2,1), opacity .18s ease; }
 #${POPOVER_ID}.is-open{ opacity:1; transform:scale(1) translateY(0); pointer-events:auto; }
-
 #${POPOVER_ID} .card{ background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.82));
   border:1px solid rgba(26,54,35,.12); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; }
 #${POPOVER_ID} .header{ display:flex; gap:10px; align-items:center; padding:14px 16px 6px; }
@@ -184,6 +184,9 @@
   padding:8px 12px; border-radius:8px; font:600 13px/1 system-ui; cursor:pointer; }
 #${POPOVER_ID} button.primary{ background:#1b5e20; color:#fff; border-color:#1b5e20; }
 #${POPOVER_ID} .arrow{ position:absolute; width:14px; height:14px; transform:rotate(45deg); background:inherit; border:inherit; }
+
+/* rote Sternchen */
+.wu-red-asterisk{ color:#d32f2f; font-weight:700; }
 `;
 
   function ensureStyle(){
@@ -192,7 +195,7 @@
     }
   }
 
-  // --- Datum (knapp & sicher) ----------------------------------------------
+  /* ---------- Datum (kompakt & stabil) ---------- */
   function dateLabel(){
     const RE = /\b(?:Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag),?\s+(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+\d{1,2},?\s+\d{4}\b/;
     const nodes = document.querySelectorAll(".usi-calendarHeader, .chadmo-gridsView .header, .usi-calendarHeader * , .chadmo-gridsView .header * , h1, h2");
@@ -202,7 +205,7 @@
     const m = RE.exec(document.body.innerText||""); return m?m[0]:"";
   }
 
-  // --- Raum (gleiche Row, sonst „links schauen“) ---------------------------
+  /* ---------- Raum (gleiche Row bevorzugt) ---------- */
   function getRoomLabel(cell, x, y){
     const row = cell.closest(".chadmo-row") || cell.parentElement;
     if(row){
@@ -220,41 +223,49 @@
     return "Dieser Raum";
   }
 
-  // --- Zeit aus der Row (mit rechtem Rand fix) -----------------------------
-  function measureRow(row){
-    const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
-    if(!cells.length) return null;
-    let startCell = cells.find(c => c.id === "0") || cells.slice().sort((a,b)=>a.getBoundingClientRect().left - b.getBoundingClientRect().left)[0];
-    const left0 = startCell.getBoundingClientRect().left;
-    const widths = cells.slice(0, Math.min(10, cells.length)).map(c => c.getBoundingClientRect().width).filter(w=>w>5).sort((a,b)=>a-b);
-    const width = widths[Math.floor(widths.length/2)] || 60;
-    const maxId = Math.max.apply(null, cells.map(c => parseInt(c.id,10)));
-    const colCount = maxId + 1; // z.B. 14 für 08..21
-    return {left0, width, colCount};
+  /* ---------- Zeit-Grenzen: zuerst Row, dann Header ---------- */
+  function rowBoundaries(row){
+    // nimm alle Zellen mit numerischem id in der Row und baue linke Kanten
+    const cells = Array.from(row.querySelectorAll('div[id]'))
+      .filter(d=>/^\d+$/.test(d.id))
+      .sort((a,b)=>parseInt(a.id,10)-parseInt(b.id,10));
+    if(cells.length<2) return null;
+    const lefts = cells.map(c=>c.getBoundingClientRect().left);
+    const right = cells[cells.length-1].getBoundingClientRect().right;
+    return {bounds:[...lefts, right], startHour:8};
   }
-  function timeBoundaries(colCount){
-    const startHour = 8;                      // 08:00 Start
-    const len = colCount + 1;                 // Grenzen = Spalten + 1 → endet bei 22:00
-    return Array.from({length: len}, (_,i)=> String(startHour+i).padStart(2,"0")+":00");
+  function headerBoundaries(){
+    const header = document.querySelector(".chadmo-gridsView .header") || document.querySelector(".chadmo-gridsView .header-columns");
+    if(!header) return null;
+    // alle direkten Header-Zellen (erste ist "RÄUME/VERFÜGBARKEITEN" → skip)
+    const cols = Array.from(header.children).filter(el=>el.getBoundingClientRect().width>0);
+    if(cols.length<2) return null;
+    const hourCols = cols.slice(1);
+    const lefts = hourCols.map(c=>c.getBoundingClientRect().left);
+    const right = hourCols[hourCols.length-1].getBoundingClientRect().right;
+    return {bounds:[...lefts, right], startHour:8};
   }
+  function findIndex(bounds, x){
+    // bounds[i] <= x < bounds[i+1]
+    const minX = bounds[0], maxX = bounds[bounds.length-1] - 0.001;
+    const xx = Math.min(Math.max(x, minX), maxX);
+    let i = bounds.length-2;
+    for(let k=0;k<bounds.length-1;k++){ if(xx>=bounds[k] && xx<bounds[k+1]){ i=k; break; } }
+    return i;
+  }
+  function hh(h){ return String(h).padStart(2,"0")+":00"; }
   function timeFromClick(cell, clientX){
     const row = cell.closest(".chadmo-row") || cell.parentElement;
-    const m = measureRow(row);
-    if(!m) return ["",""];
-
-    const bounds = timeBoundaries(m.colCount); // z.B. 15 Werte: 08..22
-    // x im gültigen Bereich einklemmen (inkl. letzter Spalte!)
-    const minX = m.left0;
-    const maxX = m.left0 + m.width * m.colCount - 0.001; // ε gegen rechts-überdrücken
-    const clampedX = Math.min(Math.max(clientX, minX), maxX);
-
-    let idx = Math.floor((clampedX - m.left0) / m.width);
-    idx = Math.max(0, Math.min(idx, m.colCount - 1));     // letzte Spalte = colCount-1
-
-    return [bounds[idx], bounds[idx+1]];
+    let grid = row && rowBoundaries(row);
+    if(!grid) grid = headerBoundaries();
+    if(!grid) return ["",""];
+    const idx = findIndex(grid.bounds, clientX);
+    const from = grid.startHour + idx;
+    const to   = from + 1;
+    return [hh(from), hh(to)];
   }
 
-  // --- „graue“ Zelle erkennen ---------------------------------------------
+  /* ---------- „graue“ Zelle erkennen ---------- */
   function near216Grey(c){ const m=c&&c.match(/\d+/g); if(!m) return false;
     const [r,g,b]=m.map(Number), tol=14; return Math.abs(r-216)<=tol && Math.abs(g-217)<=tol && Math.abs(b-218)<=tol; }
   function isBookedCell(el){
@@ -270,7 +281,7 @@
     let n=t; for(let i=0;i<6 && n;i++){ if(isBookedCell(n)) return n; n=n.parentElement; } return null;
   }
 
-  // --- Popover --------------------------------------------------------------
+  /* ---------- Popover ---------- */
   let backdrop, pop;
   function ensurePopover(){
     if(!backdrop){ backdrop=document.createElement("div"); backdrop.id=POPOVER_ID+"-backdrop";
@@ -322,12 +333,35 @@
   function closePopover(){ const bd=document.getElementById(POPOVER_ID+"-backdrop");
     if(pop) pop.classList.remove("is-open"); if(bd) bd.classList.remove("is-open"); }
 
-  // --- Click (Capture) ------------------------------------------------------
+  /* ---------- Rote Sternchen ---------- */
+  function paintAsterisks(scope=document.body){
+    // text nodes mit „*“ in sichtbaren Labels einfärben (keine Scripts/Styles/Popover)
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+      acceptNode(node){
+        if(!node.nodeValue || node.nodeValue.indexOf('*')===-1) return NodeFilter.FILTER_SKIP;
+        const p=node.parentElement; if(!p) return NodeFilter.FILTER_SKIP;
+        const tag=p.tagName; if(/SCRIPT|STYLE|NOSCRIPT|TEXTAREA|OPTION/.test(tag)) return NodeFilter.FILTER_REJECT;
+        if(p.closest('#'+POPOVER_ID)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const nodes=[]; let n; while((n=walker.nextNode())) nodes.push(n);
+    nodes.forEach(tn=>{
+      const span=document.createElement('span');
+      span.innerHTML = tn.nodeValue.replace(/\*/g,'<span class="wu-red-asterisk">*</span>');
+      tn.parentNode.replaceChild(span, tn);
+    });
+  }
+
+  /* ---------- Init + Listener ---------- */
   ensureStyle();
+  paintAsterisks();                                      // Sternchen sofort färben
+  new MutationObserver(m=>{ paintAsterisks(); })         // und bei DOM-Updates erneut
+    .observe(document.body,{subtree:true, childList:true});
+
   document.addEventListener("click", (ev)=>{
     const cell = bookedCellFromTarget(ev.target) || document.elementFromPoint(ev.clientX, ev.clientY);
     if(!cell || !isBookedCell(cell)) return;
-
     const [from,to] = timeFromClick(cell, ev.clientX);
     const room = getRoomLabel(cell, ev.clientX, ev.clientY);
     openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
