@@ -108,7 +108,7 @@
       if (!raw) continue;
       const trimmed = raw.replace(/\s+/g, " ").trim();
       if (/^space$/i.test(trimmed)) {
-        node.nodeValue = raw.replace(/space/i, "Verfügbarkeiten");
+        node.nodeValue = raw.replace(/space/i, "Räume");
         break;
       }
     }
