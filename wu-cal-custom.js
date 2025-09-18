@@ -148,13 +148,11 @@
 
 /* ===========================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
-   V5: stabiles Datum + Raum aus derselben Row + Ellipsis-Schutz
+   V6: exakte Zeit über Row-Messung (id="0" + Zellenbreite), dynamische Stunden
    =========================================================================== */
 (function () {
-  const STYLE_ID   = "wu-unavail-v5-style";
+  const STYLE_ID   = "wu-unavail-v6-style";
   const POPOVER_ID = "wu-unavail-popover";
-
-  const TIMES = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00"];
 
   const CSS = `
 #${POPOVER_ID}-backdrop{ position:fixed; inset:0; background:rgba(10,14,19,.25);
@@ -194,93 +192,84 @@
     }
   }
 
-  // ---- Grid/Time helpers ---------------------------------------------------
-  function headerRect(){
-    const h = document.querySelector(".chadmo-gridsView .header-columns") ||
-              document.querySelector(".chadmo-gridsView .header") ||
-              document.querySelector(".chadmo-gridsView");
-    return h ? h.getBoundingClientRect() : null;
-  }
-  function snapTime(clientX){
-    const r = headerRect(); if(!r) return ["",""];
-    const rel = Math.min(Math.max(clientX - r.left,0), r.width-1);
-    const idx = Math.max(0, Math.min(TIMES.length-1, Math.floor(rel / (r.width / TIMES.length))));
-    return [TIMES[idx]||"", TIMES[idx+1]||""];
-  }
-
-  // ---- Datum: triff exakt die sichtbare Datumszeile ------------------------
+  // --- Datum (knapp & sicher) ----------------------------------------------
   function dateLabel(){
     const RE = /\b(?:Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag),?\s+(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+\d{1,2},?\s+\d{4}\b/;
-    // zuerst in typischen Header-Containern suchen
-    const nodes = document.querySelectorAll(".usi-calendarHeader, .usi-calendarHeader * , .chadmo-gridsView .header, .chadmo-gridsView .header * , h1, h2");
+    const nodes = document.querySelectorAll(".usi-calendarHeader, .chadmo-gridsView .header, .usi-calendarHeader * , .chadmo-gridsView .header * , h1, h2");
     for(const n of nodes){
-      const t = (n.textContent||"").replace(/\s+/g," ").trim();
-      const m = RE.exec(t); if(m) return m[0];
+      const t=(n.textContent||"").replace(/\s+/g," ").trim(); const m=RE.exec(t); if(m) return m[0];
     }
-    // Fallback: gesamter Body-Text
-    const m = RE.exec(document.body.innerText || "");
-    return m ? m[0] : "";
+    const m = RE.exec(document.body.innerText||""); return m?m[0]:"";
   }
 
-  // ---- „graue“ Zelle erkennen ---------------------------------------------
-  function near216Grey(c){
-    if(!c) return false;
-    const m=c.match(/\d+/g); if(!m) return false;
-    const [r,g,b]=m.map(Number); const tol=14;
-    return Math.abs(r-216)<=tol && Math.abs(g-217)<=tol && Math.abs(b-218)<=tol;
+  // --- Raum (gleiche Row, sonst „links schauen“) ---------------------------
+  function getRoomLabel(cell, x, y){
+    const row = cell.closest(".chadmo-row") || cell.parentElement;
+    if(row){
+      const leftCell = row.querySelector('div[id="0"]') || row.querySelector('.left0') || row.firstElementChild;
+      if(leftCell){
+        const t=(leftCell.textContent||"").replace(/\s+/g," ").trim(); if(t) return t;
+      }
+    }
+    for(const dx of [60,100,160,220,300,380]){
+      const el = document.elementFromPoint(Math.max(0,x-dx), y);
+      if(row && el && el.closest(".chadmo-row")!==row) continue;
+      const t=(el&&el.textContent||"").replace(/\s+/g," ").trim();
+      if(t && t.length<80) return t;
+    }
+    return "Dieser Raum";
   }
+
+  // --- Zeit direkt aus der Row messen --------------------------------------
+  function measureRow(row){
+    // nimm alle Zellen mit numerischem id (0..n-1)
+    const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
+    if(!cells.length) return null;
+    // Startlinke (id=0) + Breite (Median)
+    let startCell = cells.find(c => c.id === "0") || cells.slice().sort((a,b)=>a.getBoundingClientRect().left - b.getBoundingClientRect().left)[0];
+    const left0 = startCell.getBoundingClientRect().left;
+    const widths = cells.slice(0, Math.min(10, cells.length)).map(c => c.getBoundingClientRect().width).filter(w=>w>5).sort((a,b)=>a-b);
+    const width = widths[Math.floor(widths.length/2)] || 60;
+    const maxId = Math.max.apply(null, cells.map(c => parseInt(c.id,10)));
+    const colCount = maxId + 1;
+    return {left0, width, colCount};
+  }
+  function timesForCount(count){
+    const startHour = 8; // WU-Start
+    return Array.from({length: count + 1}, (_,i)=> String(startHour+i).padStart(2,"0")+":00");
+  }
+  function timeFromClick(cell, clientX){
+    const row = cell.closest(".chadmo-row") || cell.parentElement;
+    const m = measureRow(row);
+    if(!m) return ["",""];
+    const bounds = timesForCount(m.colCount); // boundaries = count+1
+    let idx = Math.floor((clientX - m.left0) / m.width);
+    idx = Math.max(0, Math.min(idx, bounds.length - 2));
+    return [bounds[idx], bounds[idx+1]];
+  }
+
+  // --- Erkennen „graue“ Zelle ----------------------------------------------
+  function near216Grey(c){ const m=c&&c.match(/\d+/g); if(!m) return false;
+    const [r,g,b]=m.map(Number), tol=14; return Math.abs(r-216)<=tol && Math.abs(g-217)<=tol && Math.abs(b-218)<=tol; }
   function isBookedCell(el){
     if(!el || el.nodeType!==1) return false;
-    if(el.classList.contains("chadmo-cell") &&
-       el.classList.contains("month-cell") &&
-       el.classList.contains("last-merge-overlay-cell")) return true;
+    if(el.classList.contains("chadmo-cell") && el.classList.contains("month-cell") && el.classList.contains("last-merge-overlay-cell")) return true;
     if(el.classList.contains("chadmo-cell")){
       const cs=getComputedStyle(el);
       if(near216Grey(cs.backgroundColor) || /\brgb\(\s*216\s*,\s*217\s*,\s*218\s*\)/.test(el.getAttribute("style")||"")) return true;
     }
     return false;
   }
-  function bookedCellFromEventTarget(target){
-    let n=target;
-    for(let i=0;i<6 && n;i++){ if(isBookedCell(n)) return n; n=n.parentElement; }
-    return null;
+  function bookedCellFromTarget(t){
+    let n=t; for(let i=0;i<6 && n;i++){ if(isBookedCell(n)) return n; n=n.parentElement; } return null;
   }
 
-  // ---- Raum: aus derselben Row lesen, erst dann "peek left" ----------------
-  function getRoomLabel(cell, clickX, clickY){
-    const row = cell.closest(".chadmo-row") || cell.parentElement;
-
-    // 1) innerhalb derselben Row: erste/left-Zelle nehmen
-    if(row){
-      const leftCell = row.querySelector('div[id="0"]') || row.querySelector('.left0') || row.firstElementChild;
-      if(leftCell){
-        const t = (leftCell.textContent||"").replace(/\s+/g," ").trim();
-        if(t) return t;
-      }
-    }
-
-    // 2) „Peek left“, aber nur innerhalb derselben Row
-    const PAT = /(Sitzungs|Seminar|Hörsaal|Catering|Besprech|Seminarraum|Sitzungssaal|AD\.|D\d)/i;
-    for(const dx of [60,100,160,220,300,380]){
-      const el = document.elementFromPoint(Math.max(0, clickX - dx), clickY);
-      if(!el) continue;
-      if(row && el.closest(".chadmo-row") !== row) continue;
-      const t = (el.textContent||"").replace(/\s+/g," ").trim();
-      if(t && t.length<80 && (PAT.test(t) || /\d/.test(t))) return t;
-    }
-    return "Dieser Raum";
-  }
-
-  // ---- Popover --------------------------------------------------------------
+  // --- Popover --------------------------------------------------------------
   let backdrop, pop;
   function ensurePopover(){
-    if(!backdrop){
-      backdrop=document.createElement("div"); backdrop.id=POPOVER_ID+"-backdrop";
-      backdrop.addEventListener("click", closePopover, {passive:true});
-      document.body.appendChild(backdrop);
-    }
-    if(!pop){
-      pop=document.createElement("div"); pop.id=POPOVER_ID;
+    if(!backdrop){ backdrop=document.createElement("div"); backdrop.id=POPOVER_ID+"-backdrop";
+      backdrop.addEventListener("click", closePopover, {passive:true}); document.body.appendChild(backdrop); }
+    if(!pop){ pop=document.createElement("div"); pop.id=POPOVER_ID;
       pop.innerHTML=`
         <div class="card">
           <div class="header"><div class="dot">!</div><div class="title">Nicht verfügbar</div></div>
@@ -299,7 +288,7 @@
       document.body.appendChild(pop);
       pop.querySelector(".closeBtn").onclick=closePopover;
       pop.querySelector(".okBtn").onclick=closePopover;
-      window.addEventListener("keydown",(e)=>{ if(e.key==="Escape") closePopover(); });
+      window.addEventListener("keydown", e=>{ if(e.key==="Escape") closePopover(); });
     }
   }
   function openPopover({x,y,room,from,to}){
@@ -311,7 +300,6 @@
     pop.style.visibility="hidden";
     pop.classList.add("is-open");
     document.getElementById(POPOVER_ID+"-backdrop").classList.add("is-open");
-
     requestAnimationFrame(()=>{
       const card = pop.querySelector(".card");
       const r = card.getBoundingClientRect();
@@ -325,23 +313,17 @@
       pop.style.visibility="visible";
     });
   }
-  function closePopover(){
-    const bd = document.getElementById(POPOVER_ID+"-backdrop");
-    if(pop) pop.classList.remove("is-open");
-    if(bd) bd.classList.remove("is-open");
-  }
+  function closePopover(){ const bd=document.getElementById(POPOVER_ID+"-backdrop");
+    if(pop) pop.classList.remove("is-open"); if(bd) bd.classList.remove("is-open"); }
 
-  // ---- Click-Handler (Capture) ---------------------------------------------
+  // --- Click (Capture) ------------------------------------------------------
+  ensureStyle();
   document.addEventListener("click", (ev)=>{
-    const cell = bookedCellFromEventTarget(ev.target);
-    if(!cell){
-      // Fallback: direkter Hit-Test am Klickpunkt
-      let el = document.elementFromPoint(ev.clientX, ev.clientY);
-      if(!(el && isBookedCell(el))) return;
-    }
-    const c = cell || document.elementFromPoint(ev.clientX, ev.clientY);
-    const [from,to] = snapTime(ev.clientX);
-    const room = getRoomLabel(c, ev.clientX, ev.clientY);
+    const cell = bookedCellFromTarget(ev.target) || document.elementFromPoint(ev.clientX, ev.clientY);
+    if(!cell || !isBookedCell(cell)) return;
+
+    const [from,to] = timeFromClick(cell, ev.clientX);
+    const room = getRoomLabel(cell, ev.clientX, ev.clientY);
     openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
   }, true);
 })();
