@@ -236,14 +236,15 @@
   }
   function timesForCount(count){
     const startHour = 8; // WU-Start
-    return Array.from({length: count + 1}, (_,i)=> String(startHour+i).padStart(2,"0")+":00");
+    return Array.from({length: count + 2}, (_,i)=> String(startHour+i).padStart(2,"0")+":00");
   }
   function timeFromClick(cell, clientX){
     const row = cell.closest(".chadmo-row") || cell.parentElement;
     const m = measureRow(row);
     if(!m) return ["",""];
-    const bounds = timesForCount(m.colCount); // boundaries = count+1
+    const bounds = timesForCount(m.colCount); // boundaries jetzt = count+2
     let idx = Math.floor((clientX - m.left0) / m.width);
+    // wichtig: maxIndex = bounds.length-2
     idx = Math.max(0, Math.min(idx, bounds.length - 2));
     return [bounds[idx], bounds[idx+1]];
   }
