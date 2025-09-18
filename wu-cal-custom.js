@@ -118,7 +118,7 @@
     if (document.getElementById(BADGE_ID)) return;
     const b = document.createElement("div");
     b.id = BADGE_ID;
-    b.textContent = "✅ v3 SCRIPT AKTIV – " + new Date().toLocaleTimeString();
+    b.textContent = "✅ V4 SCRIPT AKTIV – " + new Date().toLocaleTimeString();
     Object.assign(b.style, {
       position: "fixed", top: "12px", right: "12px", zIndex: 999999,
       padding: "8px 10px",
@@ -148,10 +148,10 @@
 
 /* ===========================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
-   V6: exakte Zeit über Row-Messung (id="0" + Zellenbreite), dynamische Stunden
+   V7: exakte Zeit inkl. rechter Rand (21–22), robustes X-Clamping
    =========================================================================== */
 (function () {
-  const STYLE_ID   = "wu-unavail-v6-style";
+  const STYLE_ID   = "wu-unavail-v7-style";
   const POPOVER_ID = "wu-unavail-popover";
 
   const CSS = `
@@ -220,36 +220,41 @@
     return "Dieser Raum";
   }
 
-  // --- Zeit direkt aus der Row messen --------------------------------------
+  // --- Zeit aus der Row (mit rechtem Rand fix) -----------------------------
   function measureRow(row){
-    // nimm alle Zellen mit numerischem id (0..n-1)
     const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
     if(!cells.length) return null;
-    // Startlinke (id=0) + Breite (Median)
     let startCell = cells.find(c => c.id === "0") || cells.slice().sort((a,b)=>a.getBoundingClientRect().left - b.getBoundingClientRect().left)[0];
     const left0 = startCell.getBoundingClientRect().left;
     const widths = cells.slice(0, Math.min(10, cells.length)).map(c => c.getBoundingClientRect().width).filter(w=>w>5).sort((a,b)=>a-b);
     const width = widths[Math.floor(widths.length/2)] || 60;
     const maxId = Math.max.apply(null, cells.map(c => parseInt(c.id,10)));
-    const colCount = maxId + 1;
+    const colCount = maxId + 1; // z.B. 14 für 08..21
     return {left0, width, colCount};
   }
-  function timesForCount(count){
-    const startHour = 8; // WU-Start
-    return Array.from({length: count + 2}, (_,i)=> String(startHour+i).padStart(2,"0")+":00");
+  function timeBoundaries(colCount){
+    const startHour = 8;                      // 08:00 Start
+    const len = colCount + 1;                 // Grenzen = Spalten + 1 → endet bei 22:00
+    return Array.from({length: len}, (_,i)=> String(startHour+i).padStart(2,"0")+":00");
   }
   function timeFromClick(cell, clientX){
     const row = cell.closest(".chadmo-row") || cell.parentElement;
     const m = measureRow(row);
     if(!m) return ["",""];
-    const bounds = timesForCount(m.colCount); // boundaries jetzt = count+2
-    let idx = Math.floor((clientX - m.left0) / m.width);
-    // wichtig: maxIndex = bounds.length-2
-    idx = Math.max(0, Math.min(idx, bounds.length - 2));
+
+    const bounds = timeBoundaries(m.colCount); // z.B. 15 Werte: 08..22
+    // x im gültigen Bereich einklemmen (inkl. letzter Spalte!)
+    const minX = m.left0;
+    const maxX = m.left0 + m.width * m.colCount - 0.001; // ε gegen rechts-überdrücken
+    const clampedX = Math.min(Math.max(clientX, minX), maxX);
+
+    let idx = Math.floor((clampedX - m.left0) / m.width);
+    idx = Math.max(0, Math.min(idx, m.colCount - 1));     // letzte Spalte = colCount-1
+
     return [bounds[idx], bounds[idx+1]];
   }
 
-  // --- Erkennen „graue“ Zelle ----------------------------------------------
+  // --- „graue“ Zelle erkennen ---------------------------------------------
   function near216Grey(c){ const m=c&&c.match(/\d+/g); if(!m) return false;
     const [r,g,b]=m.map(Number), tol=14; return Math.abs(r-216)<=tol && Math.abs(g-217)<=tol && Math.abs(b-218)<=tol; }
   function isBookedCell(el){
