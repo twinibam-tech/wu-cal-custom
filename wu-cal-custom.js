@@ -148,22 +148,15 @@
 
 /* ===========================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
-   V4 (robust): erkennt live per elementFromPoint + Klassen + Farbtoleranz,
-   funktioniert auch bei Inline-Styles/Overlays und nach SPA-Re-Render.
+   V5: stabiles Datum + Raum aus derselben Row + Ellipsis-Schutz
    =========================================================================== */
 (function () {
-  const STYLE_ID   = "wu-unavail-v4-style";
+  const STYLE_ID   = "wu-unavail-v5-style";
   const POPOVER_ID = "wu-unavail-popover";
-  const TARGET_CLS = "wu-unavail-cell";
-  const HILITE_CLS = "wu-unavail-hilite";
 
-  // feste Zeitachse (du überschreibst Header per ::before, daher kein Text lesbar)
   const TIMES = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00"];
 
   const CSS = `
-.${TARGET_CLS}{ cursor:pointer; }
-.${TARGET_CLS}.${HILITE_CLS}{ outline:2px solid rgba(27,94,32,.65); outline-offset:-2px; }
-
 #${POPOVER_ID}-backdrop{ position:fixed; inset:0; background:rgba(10,14,19,.25);
   -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
   opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:999998; }
@@ -186,6 +179,7 @@
 #${POPOVER_ID} .body{ padding:6px 16px 14px; font:14px/1.5 system-ui, -apple-system,"Segoe UI",Roboto,Arial; }
 #${POPOVER_ID} .line{ display:flex; gap:8px; align-items:flex-start; margin-top:6px; }
 #${POPOVER_ID} .label{ min-width:74px; color:#33543f; font-weight:600; }
+#${POPOVER_ID} .value{ flex:1 1 auto; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #${POPOVER_ID} .muted{ color:#33543fa8; }
 #${POPOVER_ID} .footer{ display:flex; justify-content:flex-end; gap:10px; padding:10px 12px 12px; background:rgba(27,94,32,.06); }
 #${POPOVER_ID} button{ appearance:none; border:1px solid rgba(27,94,32,.24); background:#fff;
@@ -200,7 +194,7 @@
     }
   }
 
-  // --- GRID & TIME HELPERS -------------------------------------------------
+  // ---- Grid/Time helpers ---------------------------------------------------
   function headerRect(){
     const h = document.querySelector(".chadmo-gridsView .header-columns") ||
               document.querySelector(".chadmo-gridsView .header") ||
@@ -213,56 +207,71 @@
     const idx = Math.max(0, Math.min(TIMES.length-1, Math.floor(rel / (r.width / TIMES.length))));
     return [TIMES[idx]||"", TIMES[idx+1]||""];
   }
+
+  // ---- Datum: triff exakt die sichtbare Datumszeile ------------------------
   function dateLabel(){
-    const el = Array.from(document.querySelectorAll(".usi-calendarHeader, .header, [class*='calendar']"))
-      .find(n => /Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|\d{4}/i.test(n.textContent||""));
-    return el ? el.textContent.trim().replace(/\s+/g," ") : "";
-  }
-  function roomByPeekingLeft(x,y){
-    for(const dx of [90,140,200,260]){
-      const el = document.elementFromPoint(Math.max(0,x-dx), y);
-      const txt = (el && (el.closest('[class*="resource"],[class*="room"],[role="row"]')||el).textContent)||"";
-      const t = txt.replace(/\s+/g," ").trim();
-      if(t && t.length<90) return t;
+    const RE = /\b(?:Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag),?\s+(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+\d{1,2},?\s+\d{4}\b/;
+    // zuerst in typischen Header-Containern suchen
+    const nodes = document.querySelectorAll(".usi-calendarHeader, .usi-calendarHeader * , .chadmo-gridsView .header, .chadmo-gridsView .header * , h1, h2");
+    for(const n of nodes){
+      const t = (n.textContent||"").replace(/\s+/g," ").trim();
+      const m = RE.exec(t); if(m) return m[0];
     }
-    return "Dieser Raum";
+    // Fallback: gesamter Body-Text
+    const m = RE.exec(document.body.innerText || "");
+    return m ? m[0] : "";
   }
 
-  // --- GREY DETECTION ------------------------------------------------------
+  // ---- „graue“ Zelle erkennen ---------------------------------------------
   function near216Grey(c){
     if(!c) return false;
     const m=c.match(/\d+/g); if(!m) return false;
-    const [r,g,b]=m.map(Number); const tol=12;
+    const [r,g,b]=m.map(Number); const tol=14;
     return Math.abs(r-216)<=tol && Math.abs(g-217)<=tol && Math.abs(b-218)<=tol;
   }
   function isBookedCell(el){
     if(!el || el.nodeType!==1) return false;
-    // bevorzugt: genau deine Klassen vom Screenshot
     if(el.classList.contains("chadmo-cell") &&
        el.classList.contains("month-cell") &&
        el.classList.contains("last-merge-overlay-cell")) return true;
-    // Fallback: jedes chadmo-cell mit „grau“ (inline oder computed)
     if(el.classList.contains("chadmo-cell")){
-      const cs = getComputedStyle(el);
+      const cs=getComputedStyle(el);
       if(near216Grey(cs.backgroundColor) || /\brgb\(\s*216\s*,\s*217\s*,\s*218\s*\)/.test(el.getAttribute("style")||"")) return true;
     }
     return false;
   }
-  function findBookedFrom(el){
-    let n=el;
-    for(let i=0;i<6 && n;i++){
-      if(isBookedCell(n)) return n;
-      n=n.parentElement;
-    }
+  function bookedCellFromEventTarget(target){
+    let n=target;
+    for(let i=0;i<6 && n;i++){ if(isBookedCell(n)) return n; n=n.parentElement; }
     return null;
   }
-  function findBookedAtPoint(x,y){
-    // direkter Hit-Test am Klickort (deckt Overlays/Wrapper ab)
-    let el = document.elementFromPoint(x,y);
-    return findBookedFrom(el);
+
+  // ---- Raum: aus derselben Row lesen, erst dann "peek left" ----------------
+  function getRoomLabel(cell, clickX, clickY){
+    const row = cell.closest(".chadmo-row") || cell.parentElement;
+
+    // 1) innerhalb derselben Row: erste/left-Zelle nehmen
+    if(row){
+      const leftCell = row.querySelector('div[id="0"]') || row.querySelector('.left0') || row.firstElementChild;
+      if(leftCell){
+        const t = (leftCell.textContent||"").replace(/\s+/g," ").trim();
+        if(t) return t;
+      }
+    }
+
+    // 2) „Peek left“, aber nur innerhalb derselben Row
+    const PAT = /(Sitzungs|Seminar|Hörsaal|Catering|Besprech|Seminarraum|Sitzungssaal|AD\.|D\d)/i;
+    for(const dx of [60,100,160,220,300,380]){
+      const el = document.elementFromPoint(Math.max(0, clickX - dx), clickY);
+      if(!el) continue;
+      if(row && el.closest(".chadmo-row") !== row) continue;
+      const t = (el.textContent||"").replace(/\s+/g," ").trim();
+      if(t && t.length<80 && (PAT.test(t) || /\d/.test(t))) return t;
+    }
+    return "Dieser Raum";
   }
 
-  // --- POPOVER -------------------------------------------------------------
+  // ---- Popover --------------------------------------------------------------
   let backdrop, pop;
   function ensurePopover(){
     if(!backdrop){
@@ -301,7 +310,8 @@
 
     pop.style.visibility="hidden";
     pop.classList.add("is-open");
-    backdrop.classList.add("is-open");
+    document.getElementById(POPOVER_ID+"-backdrop").classList.add("is-open");
+
     requestAnimationFrame(()=>{
       const card = pop.querySelector(".card");
       const r = card.getBoundingClientRect();
@@ -315,32 +325,23 @@
       pop.style.visibility="visible";
     });
   }
-  function closePopover(){ pop && pop.classList.remove("is-open"); backdrop && backdrop.classList.remove("is-open"); }
-
-  // --- MARK & OBSERVE (für Hover-Cursor/Outline) --------------------------
-  function markCells(root=document){
-    root.querySelectorAll("div.chadmo-cell").forEach(el=>{
-      if(isBookedCell(el)) el.classList.add(TARGET_CLS);
-    });
+  function closePopover(){
+    const bd = document.getElementById(POPOVER_ID+"-backdrop");
+    if(pop) pop.classList.remove("is-open");
+    if(bd) bd.classList.remove("is-open");
   }
-  ensureStyle(); markCells();
-  new MutationObserver(muts=>{
-    muts.forEach(m=>{
-      m.addedNodes && m.addedNodes.forEach(n=> n.nodeType===1 && markCells(n));
-    });
-  }).observe(document.body,{subtree:true, childList:true});
 
-  // --- CLICK HANDLER (Capture) --------------------------------------------
+  // ---- Click-Handler (Capture) ---------------------------------------------
   document.addEventListener("click", (ev)=>{
-    // 1) finde echte „graue“ Zelle
-    const cell = findBookedFrom(ev.target) || findBookedAtPoint(ev.clientX, ev.clientY);
-    if(!cell) return;
-
-    // 2) Zeit + Raum
+    const cell = bookedCellFromEventTarget(ev.target);
+    if(!cell){
+      // Fallback: direkter Hit-Test am Klickpunkt
+      let el = document.elementFromPoint(ev.clientX, ev.clientY);
+      if(!(el && isBookedCell(el))) return;
+    }
+    const c = cell || document.elementFromPoint(ev.clientX, ev.clientY);
     const [from,to] = snapTime(ev.clientX);
-    const room = roomByPeekingLeft(ev.clientX, ev.clientY);
-
-    // 3) Popover
+    const room = getRoomLabel(c, ev.clientX, ev.clientY);
     openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
   }, true);
 })();
