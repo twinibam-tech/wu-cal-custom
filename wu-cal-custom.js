@@ -1,7 +1,7 @@
 /* ===========================================================================
-   WU – V5 (2025-09-23)
-   - Monat-Tab ausblenden (+ falls aktiv → auf Woche/Tag umschalten)
-   - Badge-Text aktualisiert ("V5 – HIDE MONTH TAB")
+   WU – V6.1 (2025-09-23)
+   - Monat-Tab ausblenden (Angular Material) + falls aktiv → auf Woche/Tag umschalten
+   - Badge-Text aktualisiert ("V6.1 – HIDE MONTH MATERIAL TAB")
    - Bestehende CSS-/UI-Anpassungen beibehalten
    =========================================================================== */
 
@@ -121,82 +121,75 @@
     }
   }
 
-  // NEU (V6): Monat-Tab in Angular Material ausblenden + ggf. umschalten
-function hideMonthTabAndSwitch() {
-  // Tab-Leiste suchen (Angular Material)
-  const header = document.querySelector('mat-tab-header, .mat-mdc-tab-header, [role="tablist"]');
-  if (!header) return;
+  // NEU (V6.1): Monat-Tab in Angular Material ausblenden + ggf. umschalten
+  function hideMonthTabAndSwitch() {
+    const header = document.querySelector('mat-tab-header, .mat-mdc-tab-header, [role="tablist"]');
+    if (!header) return;
 
-  const tabs = Array.from(header.querySelectorAll('[role="tab"]'));
-  if (!tabs.length) return;
+    const tabs = Array.from(header.querySelectorAll('[role="tab"]'));
+    if (!tabs.length) return;
 
-  // Helper: Text normalisieren
-  const norm = el => (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const norm = el => (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
 
-  // Ziel-Tabs finden
-  let monthTab = tabs.find(t => /monat/.test(norm(t)));
-  const weekTab  = tabs.find(t => /woche|week/.test(norm(t)));
-  const dayTab   = tabs.find(t => /\btag\b|day/.test(norm(t)));
+    let monthTab = tabs.find(t => /monat/.test(norm(t)));
+    const weekTab = tabs.find(t => /woche|week/.test(norm(t)));
+    const dayTab  = tabs.find(t => /\btag\b|day/.test(norm(t)));
 
-  // Aktiver Tab?
-  const isActive = el =>
-    el?.getAttribute('aria-selected') === 'true' ||
-    /\b(active|selected|mdc-tab--active|mat-mdc-tab-label-active)\b/i.test(el?.className || '');
+    const isActive = el =>
+      el?.getAttribute('aria-selected') === 'true' ||
+      /\b(active|selected|mdc-tab--active|mat-mdc-tab-label-active)\b/i.test(el?.className || '');
 
-  // Monats-Tab verstecken (robust: Tab-Wrapper mit ausblenden)
-  if (monthTab) {
-    const wrapper = monthTab.closest('.mat-mdc-tab, .mdc-tab, [role="tab"]') || monthTab;
-    wrapper.style.display = 'none';
-    wrapper.setAttribute('aria-hidden', 'true');
+    if (monthTab) {
+      const wrapper = monthTab.closest('.mat-mdc-tab, .mdc-tab, [role="tab"]') || monthTab;
+      wrapper.style.display = 'none';
+      wrapper.setAttribute('aria-hidden', 'true');
+    }
+
+    if (monthTab && isActive(monthTab)) {
+      const target = weekTab || dayTab || tabs.find(t => t !== monthTab);
+      if (target && typeof target.click === 'function') target.click();
+    }
   }
 
-  // Falls Monatsansicht aktiv war → auf Woche oder Tag schalten
-  if (monthTab && isActive(monthTab)) {
-    const target = weekTab || dayTab || tabs.find(t => t !== monthTab);
-    if (target && typeof target.click === 'function') target.click();
+  function showBadge() {
+    const now  = new Date().toLocaleTimeString();
+    const text = `✅ V6.1 SCRIPT AKTIV – HIDE MONTH MATERIAL TAB – ${now}`;
+    let b = document.getElementById(BADGE_ID);
+    if (!b) {
+      b = document.createElement("div");
+      b.id = BADGE_ID;
+      Object.assign(b.style, {
+        position: "fixed", top: "12px", right: "12px", zIndex: 999999,
+        padding: "8px 10px",
+        font: "14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        background: "#1b5e20", color: "#fff", borderRadius: "6px",
+        boxShadow: "0 2px 8px rgba(0,0,0,.15)"
+      });
+      document.documentElement.appendChild(b);
+    }
+    b.textContent = text;
+    setTimeout(() => b.remove(), 6000);
   }
-}
 
-// Badge immer mit neuer Versionskennung anzeigen
-function showBadge() {
-  const now  = new Date().toLocaleTimeString();
-  const text = `✅ V6 SCRIPT AKTIV – HIDE MONTH MATERIAL TAB – ${now}`;
-  let b = document.getElementById(BADGE_ID);
-  if (!b) {
-    b = document.createElement('div');
-    b.id = BADGE_ID;
-    Object.assign(b.style, {
-      position: 'fixed', top: '12px', right: '12px', zIndex: 999999,
-      padding: '8px 10px',
-      font: '14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
-      background: '#1b5e20', color: '#fff', borderRadius: '6px',
-      boxShadow: '0 2px 8px rgba(0,0,0,.15)'
-    });
-    document.documentElement.appendChild(b);
+  function applyAll() {
+    injectStyle();
+    renameSpaceOnce();
+    hideMonthTabAndSwitch();
+    showBadge();
   }
-  b.textContent = text;           // bei jedem Lauf aktualisieren
-  setTimeout(() => b.remove(), 6000);
-}
 
-// Einmal alles anwenden
-function applyAll() {
-  injectStyle();
-  renameSpaceOnce();
-  hideMonthTabAndSwitch();        // V6: Material-Tab „Monat“ verstecken
-  showBadge();                    // Badge mit V6-Text
-}
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", applyAll);
+  } else {
+    applyAll();
+  }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', applyAll);
-} else {
-  applyAll();
-}
+  new MutationObserver(() => {
+    renameSpaceOnce();
+    hideMonthTabAndSwitch();
+  }).observe(document.documentElement, { subtree: true, childList: true });
 
-// Bei DOM-Änderungen Tabs weiter kontrollieren (Paginierung/Redraws)
-new MutationObserver(() => {
-  renameSpaceOnce();
-  hideMonthTabAndSwitch();
-}).observe(document.documentElement, { subtree: true, childList: true });
+})(); 
 
 /* ===========================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
@@ -244,7 +237,6 @@ new MutationObserver(() => {
     }
   }
 
-  // --- Datum (knapp & sicher) ----------------------------------------------
   function dateLabel(){
     const RE = /\b(?:Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag),?\s+(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+\d{1,2},?\s+\d{4}\b/;
     const nodes = document.querySelectorAll(".usi-calendarHeader, .chadmo-gridsView .header, .usi-calendarHeader * , .chadmo-gridsView .header * , h1, h2");
@@ -254,7 +246,6 @@ new MutationObserver(() => {
     const m = RE.exec(document.body.innerText||""); return m?m[0]:"";
   }
 
-  // --- Raum (gleiche Row, sonst „links schauen“) ---------------------------
   function getRoomLabel(cell, x, y){
     const row = cell.closest(".chadmo-row") || cell.parentElement;
     if(row){
@@ -272,7 +263,6 @@ new MutationObserver(() => {
     return "Dieser Raum";
   }
 
-  // --- Zeit aus der Row (mit rechtem Rand fix) -----------------------------
   function measureRow(row){
     const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
     if(!cells.length) return null;
@@ -281,12 +271,12 @@ new MutationObserver(() => {
     const widths = cells.slice(0, Math.min(10, cells.length)).map(c => c.getBoundingClientRect().width).filter(w=>w>5).sort((a,b)=>a-b);
     const width = widths[Math.floor(widths.length/2)] || 60;
     const maxId = Math.max.apply(null, cells.map(c => parseInt(c.id,10)));
-    const colCount = maxId + 1; // z.B. 14 für 08..21
+    const colCount = maxId + 1;
     return {left0, width, colCount};
   }
   function timeBoundaries(colCount){
-    const startHour = 8;                      // 08:00 Start
-    const len = colCount + 1;                 // Grenzen = Spalten + 1 → endet bei 22:00
+    const startHour = 8;
+    const len = colCount + 1;
     return Array.from({length: len}, (_,i)=> String(startHour+i).padStart(2,"0")+":00");
   }
   function timeFromClick(cell, clientX){
@@ -294,19 +284,17 @@ new MutationObserver(() => {
     const m = measureRow(row);
     if(!m) return ["",""];
 
-    const bounds = timeBoundaries(m.colCount); // z.B. 15 Werte: 08..22
-    // x im gültigen Bereich einklemmen (inkl. letzter Spalte!)
+    const bounds = timeBoundaries(m.colCount);
     const minX = m.left0;
-    const maxX = m.left0 + m.width * m.colCount - 0.001; // ε gegen rechts-überdrücken
+    const maxX = m.left0 + m.width * m.colCount - 0.001;
     const clampedX = Math.min(Math.max(clientX, minX), maxX);
 
     let idx = Math.floor((clampedX - m.left0) / m.width);
-    idx = Math.max(0, Math.min(idx, m.colCount - 1));     // letzte Spalte = colCount-1
+    idx = Math.max(0, Math.min(idx, m.colCount - 1));
 
     return [bounds[idx], bounds[idx+1]];
   }
 
-  // --- „graue“ Zelle erkennen ---------------------------------------------
   function near216Grey(c){ const m=c&&c.match(/\d+/g); if(!m) return false;
     const [r,g,b]=m.map(Number), tol=14; return Math.abs(r-216)<=tol && Math.abs(g-217)<=tol && Math.abs(b-218)<=tol; }
   function isBookedCell(el){
@@ -322,7 +310,6 @@ new MutationObserver(() => {
     let n=t; for(let i=0;i<6 && n;i++){ if(isBookedCell(n)) return n; n=n.parentElement; } return null;
   }
 
-  // --- Popover --------------------------------------------------------------
   let backdrop, pop;
   function ensureStyle(){
     if(!document.getElementById(STYLE_ID)){
@@ -379,7 +366,6 @@ new MutationObserver(() => {
   function closePopover(){ const bd=document.getElementById(POPOVER_ID+"-backdrop");
     if(pop) pop.classList.remove("is-open"); if(bd) bd.classList.remove("is-open"); }
 
-  // --- Click (Capture) ------------------------------------------------------
   ensureStyle();
   document.addEventListener("click", (ev)=>{
     const cell = bookedCellFromTarget(ev.target) || document.elementFromPoint(ev.clientX, ev.clientY);
