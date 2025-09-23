@@ -1,9 +1,16 @@
-/* wu-cal-custom.js – CSS-Injection + sichtbarer Badge + "SPACE" -> "Verfügbarkeiten" */
+/* ===========================================================================
+   WU – V5 (2025-09-23)
+   - Monat-Tab ausblenden (+ falls aktiv → auf Woche/Tag umschalten)
+   - Badge-Text aktualisiert ("V5 – HIDE MONTH TAB")
+   - Bestehende CSS-/UI-Anpassungen beibehalten
+   =========================================================================== */
+
+/* wu-cal-custom.js – CSS-Injection + sichtbarer Badge + "SPACE" -> "Räume" */
 (function () {
   const STYLE_ID = "wu-inline-css";
   const BADGE_ID = "wu-inline-badge";
 
-  // === Dein funktionierendes CSS (unverändert) ===
+  // === Dein bestehendes CSS (unverändert) ==================================
   const CSS = `
 /* ============================================================================ */
 /* ===== Header Logo (smaller, moved inward, responsive) ====================== */
@@ -114,26 +121,66 @@
     }
   }
 
+  // NEU: Monat-Tab ausblenden + ggf. Umschalten
+  function hideMonthTabAndSwitch() {
+    // Kandidaten: Tabs/Buttons/Links im Header-Bereich des Kalenders
+    const root = document.querySelector(".usi-calendarHeader, .chadmo-gridsView") || document;
+    if (!root) return;
+
+    const tabs = Array.from(root.querySelectorAll("button, a, li, span, div"));
+    let monthEl = null;
+    let activeIsMonth = false;
+
+    for (const el of tabs) {
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (!txt) continue;
+      const isMonth = (txt === "monat" || txt.includes("monat")); // de
+      if (isMonth) {
+        monthEl = el;
+        // verstecken
+        el.style.display = "none";
+        el.setAttribute("aria-hidden", "true");
+        // ist der Tab gerade aktiv markiert?
+        const hasActive = /\b(active|selected|is-active)\b/i.test(el.className) || el.getAttribute("aria-selected") === "true";
+        activeIsMonth = activeIsMonth || hasActive;
+      }
+    }
+
+    // Falls Monatsansicht aktiv → auf Woche oder Tag umschalten
+    if (activeIsMonth) {
+      const prefer = ["woche", "tag", "week", "day"];
+      for (const key of prefer) {
+        const cand = tabs.find(el => ((el.textContent || "").trim().toLowerCase().includes(key)));
+        if (cand && cand.click) { cand.click(); break; }
+      }
+    }
+  }
+
   function showBadge() {
-    if (document.getElementById(BADGE_ID)) return;
-    const b = document.createElement("div");
-    b.id = BADGE_ID;
-    b.textContent = "✅ V4 SCRIPT AKTIV – " + new Date().toLocaleTimeString();
-    Object.assign(b.style, {
-      position: "fixed", top: "12px", right: "12px", zIndex: 999999,
-      padding: "8px 10px",
-      font: "14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-      background: "#1b5e20", color: "#fff", borderRadius: "6px",
-      boxShadow: "0 2px 8px rgba(0,0,0,.15)"
-    });
-    document.documentElement.appendChild(b);
+    const now = new Date().toLocaleTimeString();
+    const text = `✅ V5 SCRIPT AKTIV – HIDE MONTH TAB – ${now}`;
+    let b = document.getElementById(BADGE_ID);
+    if (!b) {
+      b = document.createElement("div");
+      b.id = BADGE_ID;
+      Object.assign(b.style, {
+        position: "fixed", top: "12px", right: "12px", zIndex: 999999,
+        padding: "8px 10px",
+        font: "14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        background: "#1b5e20", color: "#fff", borderRadius: "6px",
+        boxShadow: "0 2px 8px rgba(0,0,0,.15)"
+      });
+      document.documentElement.appendChild(b);
+    }
+    b.textContent = text;            // Badge-Text bei jedem Lauf aktualisieren
     setTimeout(() => b.remove(), 6000);
   }
 
   function applyAll() {
     injectStyle();
     renameSpaceOnce();
-    showBadge();
+    hideMonthTabAndSwitch();         // NEU
+    showBadge();                     // Badge mit V5-Text
   }
 
   if (document.readyState === "loading") {
@@ -142,8 +189,11 @@
     applyAll();
   }
 
-  new MutationObserver(() => renameSpaceOnce())
-    .observe(document.documentElement, {subtree:true, childList:true});
+  // Bei DOM-Änderungen Monat-Tab weiter verstecken
+  new MutationObserver(() => {
+    renameSpaceOnce();
+    hideMonthTabAndSwitch();
+  }).observe(document.documentElement, {subtree:true, childList:true});
 })();
 
 /* ===========================================================================
@@ -272,6 +322,11 @@
 
   // --- Popover --------------------------------------------------------------
   let backdrop, pop;
+  function ensureStyle(){
+    if(!document.getElementById(STYLE_ID)){
+      const s=document.createElement("style"); s.id=STYLE_ID; s.textContent=CSS; document.head.appendChild(s);
+    }
+  }
   function ensurePopover(){
     if(!backdrop){ backdrop=document.createElement("div"); backdrop.id=POPOVER_ID+"-backdrop";
       backdrop.addEventListener("click", closePopover, {passive:true}); document.body.appendChild(backdrop); }
