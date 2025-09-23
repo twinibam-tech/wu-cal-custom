@@ -121,80 +121,82 @@
     }
   }
 
-  // NEU: Monat-Tab ausblenden + ggf. Umschalten
-  function hideMonthTabAndSwitch() {
-    // Kandidaten: Tabs/Buttons/Links im Header-Bereich des Kalenders
-    const root = document.querySelector(".usi-calendarHeader, .chadmo-gridsView") || document;
-    if (!root) return;
+  // NEU (V6): Monat-Tab in Angular Material ausblenden + ggf. umschalten
+function hideMonthTabAndSwitch() {
+  // Tab-Leiste suchen (Angular Material)
+  const header = document.querySelector('mat-tab-header, .mat-mdc-tab-header, [role="tablist"]');
+  if (!header) return;
 
-    const tabs = Array.from(root.querySelectorAll("button, a, li, span, div"));
-    let monthEl = null;
-    let activeIsMonth = false;
+  const tabs = Array.from(header.querySelectorAll('[role="tab"]'));
+  if (!tabs.length) return;
 
-    for (const el of tabs) {
-      const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      if (!txt) continue;
-      const isMonth = (txt === "monat" || txt.includes("monat")); // de
-      if (isMonth) {
-        monthEl = el;
-        // verstecken
-        el.style.display = "none";
-        el.setAttribute("aria-hidden", "true");
-        // ist der Tab gerade aktiv markiert?
-        const hasActive = /\b(active|selected|is-active)\b/i.test(el.className) || el.getAttribute("aria-selected") === "true";
-        activeIsMonth = activeIsMonth || hasActive;
-      }
-    }
+  // Helper: Text normalisieren
+  const norm = el => (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
 
-    // Falls Monatsansicht aktiv → auf Woche oder Tag umschalten
-    if (activeIsMonth) {
-      const prefer = ["woche", "tag", "week", "day"];
-      for (const key of prefer) {
-        const cand = tabs.find(el => ((el.textContent || "").trim().toLowerCase().includes(key)));
-        if (cand && cand.click) { cand.click(); break; }
-      }
-    }
+  // Ziel-Tabs finden
+  let monthTab = tabs.find(t => /monat/.test(norm(t)));
+  const weekTab  = tabs.find(t => /woche|week/.test(norm(t)));
+  const dayTab   = tabs.find(t => /\btag\b|day/.test(norm(t)));
+
+  // Aktiver Tab?
+  const isActive = el =>
+    el?.getAttribute('aria-selected') === 'true' ||
+    /\b(active|selected|mdc-tab--active|mat-mdc-tab-label-active)\b/i.test(el?.className || '');
+
+  // Monats-Tab verstecken (robust: Tab-Wrapper mit ausblenden)
+  if (monthTab) {
+    const wrapper = monthTab.closest('.mat-mdc-tab, .mdc-tab, [role="tab"]') || monthTab;
+    wrapper.style.display = 'none';
+    wrapper.setAttribute('aria-hidden', 'true');
   }
 
-  function showBadge() {
-    const now = new Date().toLocaleTimeString();
-    const text = `✅ V5 SCRIPT AKTIV – HIDE MONTH TAB – ${now}`;
-    let b = document.getElementById(BADGE_ID);
-    if (!b) {
-      b = document.createElement("div");
-      b.id = BADGE_ID;
-      Object.assign(b.style, {
-        position: "fixed", top: "12px", right: "12px", zIndex: 999999,
-        padding: "8px 10px",
-        font: "14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-        background: "#1b5e20", color: "#fff", borderRadius: "6px",
-        boxShadow: "0 2px 8px rgba(0,0,0,.15)"
-      });
-      document.documentElement.appendChild(b);
-    }
-    b.textContent = text;            // Badge-Text bei jedem Lauf aktualisieren
-    setTimeout(() => b.remove(), 6000);
+  // Falls Monatsansicht aktiv war → auf Woche oder Tag schalten
+  if (monthTab && isActive(monthTab)) {
+    const target = weekTab || dayTab || tabs.find(t => t !== monthTab);
+    if (target && typeof target.click === 'function') target.click();
   }
+}
 
-  function applyAll() {
-    injectStyle();
-    renameSpaceOnce();
-    hideMonthTabAndSwitch();         // NEU
-    showBadge();                     // Badge mit V5-Text
+// Badge immer mit neuer Versionskennung anzeigen
+function showBadge() {
+  const now  = new Date().toLocaleTimeString();
+  const text = `✅ V6 SCRIPT AKTIV – HIDE MONTH MATERIAL TAB – ${now}`;
+  let b = document.getElementById(BADGE_ID);
+  if (!b) {
+    b = document.createElement('div');
+    b.id = BADGE_ID;
+    Object.assign(b.style, {
+      position: 'fixed', top: '12px', right: '12px', zIndex: 999999,
+      padding: '8px 10px',
+      font: '14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+      background: '#1b5e20', color: '#fff', borderRadius: '6px',
+      boxShadow: '0 2px 8px rgba(0,0,0,.15)'
+    });
+    document.documentElement.appendChild(b);
   }
+  b.textContent = text;           // bei jedem Lauf aktualisieren
+  setTimeout(() => b.remove(), 6000);
+}
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", applyAll);
-  } else {
-    applyAll();
-  }
+// Einmal alles anwenden
+function applyAll() {
+  injectStyle();
+  renameSpaceOnce();
+  hideMonthTabAndSwitch();        // V6: Material-Tab „Monat“ verstecken
+  showBadge();                    // Badge mit V6-Text
+}
 
-  // Bei DOM-Änderungen Monat-Tab weiter verstecken
-  new MutationObserver(() => {
-    renameSpaceOnce();
-    hideMonthTabAndSwitch();
-  }).observe(document.documentElement, {subtree:true, childList:true});
-})();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', applyAll);
+} else {
+  applyAll();
+}
+
+// Bei DOM-Änderungen Tabs weiter kontrollieren (Paginierung/Redraws)
+new MutationObserver(() => {
+  renameSpaceOnce();
+  hideMonthTabAndSwitch();
+}).observe(document.documentElement, { subtree: true, childList: true });
 
 /* ===========================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
