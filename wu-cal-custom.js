@@ -376,9 +376,7 @@
 
 
 /* ============================================================================
-   WU – Harmonisches Hinweis-Popup (Modal) – v2
-   - Drop-in Ersatz für dein bisheriges IIFE 3
-   - Ruhige Typografie, stimmige Abstände, dezenter Look
+   WU – Hinweis-Popup (Modal) – türkis, harmonisch – v3
    ============================================================================ */
 (function () {
   const CFG = {
@@ -395,15 +393,15 @@
   };
   if (!CFG.enabled) return;
 
-  // sanfte, einheitliche Design-Tokens
+  // Farben/Design zentral (leicht anpassbar):
   const THEME = {
-    primary: "#1b5e20",
-    primaryDark: "#15501b",
+    primary: "#0f6e85",      // türkiser Akzent (ggf. an WU-Farbe anpassen)
+    primaryDark: "#0d5f73",
     surface: "#ffffff",
-    surfaceAlt: "#f7faf8",
-    text: "#0a1a12",
-    textMuted: "#415b4d",
-    link: "#145ca8",
+    surfaceAlt: "#f5f9f9",
+    text: "#0a171a",
+    textMuted: "#41616a",
+    link: "#0f6e85",
     radiusLg: "14px",
     radiusSm: "10px",
     shadow: "0 14px 40px rgba(0,0,0,.18)",
@@ -411,24 +409,20 @@
   };
 
   const MODAL_ID = "wu-info-modal";
-  const STYLE_ID = "wu-info-modal-style-v2";
+  const STYLE_ID = "wu-info-modal-style-v3";
 
   const CSS = `
-/* --- Backdrop ------------------------------------------------------------ */
 #${MODAL_ID}-backdrop{
-  position:fixed; inset:0; background:rgba(10,14,19,.33);
+  position:fixed; inset:0; background:rgba(8,28,33,.36);
   -webkit-backdrop-filter:blur(${THEME.blur}); backdrop-filter:blur(${THEME.blur});
-  opacity:0; pointer-events:none; transition:opacity .18s ease;
-  z-index:2147483645;
+  opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:2147483645;
 }
 #${MODAL_ID}-backdrop.is-open{ opacity:1; pointer-events:auto; }
 
-/* --- Container ----------------------------------------------------------- */
 #${MODAL_ID}{ position:fixed; inset:0; display:grid; place-items:center;
   z-index:2147483646; opacity:0; pointer-events:none; transition:opacity .18s ease; }
 #${MODAL_ID}.is-open{ opacity:1; pointer-events:auto; }
 
-/* --- Dialog -------------------------------------------------------------- */
 #${MODAL_ID} .dialog{
   width:min(640px,92vw); background:${THEME.surface}; color:${THEME.text};
   border:1px solid rgba(0,0,0,.06); border-radius:${THEME.radiusLg};
@@ -437,44 +431,36 @@
 }
 #${MODAL_ID}.is-open .dialog{ transform:translateY(0) scale(1); }
 
-/* zarte Akzentoberkante statt harter Vollfläche */
 #${MODAL_ID} .accent{ height:6px; background:linear-gradient(90deg, ${THEME.primary}, ${THEME.primaryDark}); }
 
-/* Kopfbereich */
 #${MODAL_ID} .header{ display:flex; align-items:center; gap:10px; padding:14px 18px 6px; }
-#${MODAL_ID} .icon{ width:26px; height:26px; border-radius:8px;
-  background:${THEME.primary}; color:#fff; display:grid; place-items:center; font-weight:800; }
+#${MODAL_ID} .icon{ width:26px; height:26px; border-radius:8px; background:${THEME.primary};
+  color:#fff; display:grid; place-items:center; font-weight:800; }
 #${MODAL_ID} .title{ font:600 18px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
 
-/* Inhalt */
 #${MODAL_ID} .body{ padding:8px 18px 2px; font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
 #${MODAL_ID} .body p{ margin:0 0 10px; }
 #${MODAL_ID} .body a{ color:${THEME.link}; text-underline-offset:2px; }
 
-/* Fußbereich */
 #${MODAL_ID} .footer{
-  display:flex; align-items:center; gap:10px;
-  padding:12px 18px; background:${THEME.surfaceAlt}; border-top:1px solid rgba(0,0,0,.05);
+  display:flex; align-items:center; gap:10px; padding:12px 18px;
+  background:${THEME.surfaceAlt}; border-top:1px solid rgba(0,0,0,.05);
   border-bottom-left-radius:${THEME.radiusLg}; border-bottom-right-radius:${THEME.radiusLg};
 }
 #${MODAL_ID} .left{ margin-right:auto; display:inline-flex; align-items:center; gap:8px;
   color:${THEME.textMuted}; font:13px/1.1 system-ui; }
 #${MODAL_ID} input[type="checkbox"]{ transform:translateY(1px); }
 
-/* Buttons – ruhiger, konsistent */
 #${MODAL_ID} button{
   appearance:none; border:1px solid rgba(0,0,0,.12); background:#fff; color:${THEME.text};
   padding:9px 14px; border-radius:${THEME.radiusSm}; font:600 14px/1 system-ui; cursor:pointer;
   transition:background .15s ease, border-color .15s ease, transform .02s ease;
 }
-#${MODAL_ID} button:hover{ background:#f3f6f4; }
+#${MODAL_ID} button:hover{ background:#eef6f7; }
 #${MODAL_ID} button:active{ transform:translateY(1px); }
-#${MODAL_ID} button.primary{
-  background:${THEME.primary}; color:#fff; border-color:${THEME.primary};
-}
+#${MODAL_ID} button.primary{ background:${THEME.primary}; color:#fff; border-color:${THEME.primary}; }
 #${MODAL_ID} button.primary:hover{ background:${THEME.primaryDark}; }
 
-/* Motion-Preference respektieren */
 @media (prefers-reduced-motion: reduce) {
   #${MODAL_ID}-backdrop, #${MODAL_ID}, #${MODAL_ID} .dialog { transition:none !important; }
 }
@@ -495,8 +481,7 @@
 
   function ensureStyle(){
     if (document.getElementById(STYLE_ID)) return;
-    const s = document.createElement("style");
-    s.id = STYLE_ID; s.textContent = CSS; document.head.appendChild(s);
+    const s = document.createElement("style"); s.id = STYLE_ID; s.textContent = CSS; document.head.appendChild(s);
   }
 
   function buildModal(){
@@ -517,8 +502,7 @@
         <div class="body">${CFG.html}</div>
         <div class="footer">
           <label class="left"><input type="checkbox" id="${MODAL_ID}-mute"> Heute nicht mehr zeigen</label>
-          <button class="secondary" id="${MODAL_ID}-close">Schließen</button>
-          <button class="primary" id="${MODAL_ID}-ok">Ok</button>
+          <button class="primary" id="${MODAL_ID}-close">Schließen</button>
         </div>
       </div>
     `;
@@ -526,13 +510,16 @@
     document.body.appendChild(modal);
 
     function close(){
-      modal.classList.remove("is-open"); backdrop.classList.remove("is-open");
+      modal.classList.remove("is-open");
+      backdrop.classList.remove("is-open");
       const mute = document.getElementById(`${MODAL_ID}-mute`);
       if (mute && mute.checked) markSeenToday();
       setTimeout(()=>{ openerBtn?.focus?.(); }, 0);
     }
+
+    // Buttons: nur „Schließen“
     modal.querySelector(`#${MODAL_ID}-close`).addEventListener("click", close);
-    modal.querySelector(`#${MODAL_ID}-ok`).addEventListener("click", close);
+    // ESC oder Klick außerhalb schließt ebenfalls:
     backdrop.addEventListener("click", close);
     window.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
   }
@@ -546,14 +533,13 @@
     setTimeout(()=> document.querySelector(`#${MODAL_ID} button.primary`)?.focus?.(), 40);
   }
 
-  // öffentliche Helper-Funktion
+  // Öffnen per Konsole/Code: WU_ShowInfoModal()
   window.WU_ShowInfoModal = () => openModal();
 
   if (!alreadySeenToday()) {
     const start = () => setTimeout(() => openModal(), CFG.delayMs);
-    (document.readyState === "loading")
-      ? document.addEventListener("DOMContentLoaded", start)
-      : start();
+    (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
   }
 })();
+
 
