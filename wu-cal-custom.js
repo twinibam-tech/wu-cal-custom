@@ -1,3 +1,4 @@
+<script>
 /* =============================================================================
    WU – OSB Online Space Booking – Kundenseitiger "One-File"-Injector
    ---------------------------------------------------------------------------
@@ -11,17 +12,7 @@
    - Zeigt kurz einen Badge rechts oben (Version + „HIDE MONTH“) als Sichtbarkeitscheck.
    - Fügt ein Popover hinzu: Klick auf graue/belegte Kästchen → „Nicht verfügbar“
      mit sauber ermittelter Zeitspanne (inkl. rechtem Rand 21–22) und Raumbezug.
-   - NEU (Kunden-Info-Popup): Schönes, professionelles Modal-Fenster
-     für frei formulierbare Hinweise inkl. Link (z. B. „Hier findest du unser Handbuch“).
-     * Konfigurierbar: Titel, Text/HTML, Link, Verzögerung, Anzeigeintervall ("einmal pro Tag").
-     * Globale Helper-Funktion: window.WU_ShowInfoModal() zum manuellen Öffnen.
-
-   Hinweise:
-   - Keine Abhängigkeiten. Greift schreibend nur auf document/head/body zu.
-   - Kapselung via IIFEs; Namensräume und IDs beginnen mit "wu-".
-   - Barrierearm: ARIA-Rollen, Escape zum Schließen, Fokuserhalt.
-   - Nichts am Server nötig; rein clientseitig.
-
+   - Kunden-Info-Popup (Modal) inkl. fester „Hilfe & Infos“-Schaltfläche.
    ============================================================================ */
 
 
@@ -35,7 +26,6 @@
   const STYLE_ID = "wu-inline-css";
   const BADGE_ID = "wu-inline-badge";
 
-  // ==== DEIN CSS (unverändert) =============================================
   const CSS = `
 /* Header-Logo leicht nach innen & responsive */
 .usi-gradientbackground{ position:relative; padding-right:clamp(120px,12vw,220px)!important; }
@@ -117,9 +107,7 @@
     }
   }
 
-  // === V7: „Monat“-Tab ausblenden (Angular Material) ======================
   function hideMonthTabAndSwitch(){
-    // alle Tab-Leisten berücksichtigen (es können mehrere auf der Seite sein)
     const headers = document.querySelectorAll('mat-tab-header, .mat-mdc-tab-header, [role="tablist"]');
     headers.forEach(header => {
       const tabs = Array.from(header.querySelectorAll('div[role="tab"]'));
@@ -149,7 +137,6 @@
     });
   }
 
-  // Badge mit Versions-Label
   function showBadge(){
     const now = new Date().toLocaleTimeString();
     const text = `✅ V8 SCRIPT AKTIV – Pop Up – ${now}`;
@@ -183,13 +170,13 @@
     applyAll();
   }
 
-  // Re-draws/Navigation abfangen (Angular aktualisiert die Tab-Leiste dynamisch)
   new MutationObserver(() => {
     renameSpaceOnce();
     hideMonthTabAndSwitch();
   }).observe(document.documentElement, {subtree:true, childList:true});
 
 })(); // IIFE 1
+
 
 /* ============================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
@@ -236,7 +223,6 @@
     }
   }
 
-  // Datum lesen
   function dateLabel(){
     const RE = /\b(?:Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag),?\s+(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+\d{1,2},?\s+\d{4}\b/;
     const nodes = document.querySelectorAll(".usi-calendarHeader, .chadmo-gridsView .header, .usi-calendarHeader *, .chadmo-gridsView .header *, h1, h2");
@@ -247,7 +233,6 @@
     const m = RE.exec(document.body.innerText || ""); return m ? m[0] : "";
   }
 
-  // Raumbezeichnung aus der Zeile
   function getRoomLabel(cell, x, y){
     const row = cell.closest(".chadmo-row") || cell.parentElement;
     if (row){
@@ -265,7 +250,6 @@
     return "Dieser Raum";
   }
 
-  // Spaltenbreite/Index → Zeitfenster
   function measureRow(row){
     const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
     if (!cells.length) return null;
@@ -274,7 +258,7 @@
     const widths = cells.slice(0, Math.min(10, cells.length)).map(c => c.getBoundingClientRect().width).filter(w=>w>5).sort((a,b)=>a-b);
     const width = widths[Math.floor(widths.length/2)] || 60;
     const maxId = Math.max.apply(null, cells.map(c => parseInt(c.id,10)));
-    const colCount = maxId + 1; // 08..21 => 14
+    const colCount = maxId + 1;
     return {left0, width, colCount};
   }
   function timeBoundaries(colCount){
@@ -309,7 +293,6 @@
   }
 
   let backdrop, pop;
-  function ensureStyle(){ if(!document.getElementById(STYLE_ID)){ const s=document.createElement("style"); s.id=STYLE_ID; s.textContent=CSS; document.head.appendChild(s);} }
   function ensurePopover(){
     if(!backdrop){ backdrop=document.createElement("div"); backdrop.id=POPOVER_ID+"-backdrop";
       backdrop.addEventListener("click", closePopover, {passive:true}); document.body.appendChild(backdrop); }
@@ -374,26 +357,12 @@
 })(); // IIFE 2
 
 
-
 /* ============================================================================
-   WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.2
-   ---------------------------------------------------------------------------
-   Was macht dieser Block?
-   - Zeigt ein harmonisches Hinweis-Modal mit klarem Fokus:
-     "Aktuell limitiert die eingesetzte Software die Raumdetails."
-   - Deutliche CTAs: "Rauminfo-Tool öffnen" (Primary) & "Handbuch (PDF)".
-   - Klick auf Backdrop / außerhalb, ESC, oder "Schließen" → Modal zu.
-   - "Heute nicht mehr zeigen" speichert das heutige Datum in localStorage
-     (Key: wu-info-modal-lastSeen).
-   - Dauerhafter "Hilfe & Infos"-Button rechts oben mit Dropdown:
-       • Rauminfo-Tool   • Handbuch (PDF)   • Hinweis erneut anzeigen
-     Bleibt bei SPA/Redraws bestehen (MutationObserver).
-   - Globale Helper: window.WU_ShowInfoModal() (öffnet Modal manuell).
-
-   Anpassung:
-   - Text/Links im CFG.html
-   - Farben im THEME.primary / primaryDark
-   - Auto-Delay über CFG.delayMs (ms)
+   WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.3
+   Anpassungen:
+   - „Hilfe & Infos“-Button fix nach rechts-unten (sticky beim Scroll).
+   - Popover klappt oberhalb aus (unten rechts ausgerichtet).
+   - „i“-Icon ohne farbige Kachel (Modal & Callout).
    ============================================================================ */
 (function () {
   const CFG = {
@@ -426,7 +395,6 @@
   };
   if (!CFG.enabled) return;
 
-  // Farb-/Design-Tokens (Türkis)
   const THEME = {
     primary: "#0f6e85",
     primaryDark: "#0d5f73",
@@ -442,7 +410,7 @@
   };
 
   const MODAL_ID = "wu-info-modal";
-  const STYLE_ID = "wu-info-modal-style-v52";
+  const STYLE_ID = "wu-info-modal-style-v53";
   const HELP_BTN_ID = "wu-help-button";
   const HELP_POPOVER_ID = "wu-help-popover";
 
@@ -471,8 +439,11 @@
 #${MODAL_ID} .accent{ height:6px; background:linear-gradient(90deg, ${THEME.primary}, ${THEME.primaryDark}); }
 
 #${MODAL_ID} .header{ display:flex; align-items:center; gap:10px; padding:14px 18px 6px; }
-#${MODAL_ID} .icon{ width:26px; height:26px; border-radius:8px; background:${THEME.primary};
-  color:#fff; display:grid; place-items:center; font-weight:800; }
+/* Icon ohne farbige Kachel */
+#${MODAL_ID} .icon{
+  width:auto; height:auto; border-radius:0; background:transparent; padding:0;
+  color:${THEME.primary}; font:700 18px/1 system-ui;
+}
 #${MODAL_ID} .title{ font:600 18px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
 
 #${MODAL_ID} .body{ padding:8px 18px 8px; font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
@@ -483,8 +454,11 @@
 /* Callout-Stil */
 #${MODAL_ID} .wu-callout{ display:flex; gap:12px; padding:12px; background:${THEME.surfaceAlt};
   border:1px solid rgba(0,0,0,.06); border-radius:${THEME.radiusSm}; margin:2px 0 12px; }
-#${MODAL_ID} .wu-callout-icon{ width:30px; height:30px; border-radius:8px; background:${THEME.primary}; color:#fff;
-  display:grid; place-items:center; font-weight:800; flex:0 0 auto; }
+/* Callout-Icon ohne Kachel */
+#${MODAL_ID} .wu-callout-icon{
+  width:auto; height:auto; border-radius:0; background:transparent; padding:0;
+  color:${THEME.primary}; font:700 18px/1 system-ui; flex:0 0 auto;
+}
 #${MODAL_ID} .wu-callout-title{ font-weight:700; margin-bottom:6px; }
 
 /* CTA-Reihe */
@@ -520,19 +494,20 @@
 #${MODAL_ID} button.primary{ background:${THEME.primary}; border-color:${THEME.primary}; color:#fff; }
 #${MODAL_ID} button.primary:hover{ background:${THEME.primaryDark}; }
 
-/* --- Fixer "Hilfe & Infos"-Button rechts oben ---------------------------- */
+/* --- Fixer "Hilfe & Infos"-Button: unten rechts andocken ----------------- */
 #${HELP_BTN_ID}{
-  position:fixed; top:10px; right:10px; z-index:2147483647;
+  position:fixed; bottom:14px; right:14px; z-index:2147483647;
   padding:8px 12px; border-radius:999px; background:${THEME.primary}; color:#fff;
   font:600 13px/1 system-ui; border:1px solid ${THEME.primaryDark};
   box-shadow:0 6px 16px rgba(0,0,0,.18); cursor:pointer; user-select:none;
 }
 #${HELP_BTN_ID}:hover{ background:${THEME.primaryDark}; }
-.usi-gradientbackground #${HELP_BTN_ID}{ position:absolute; top:12px; right:16px; }
+/* Vorsorglich Header-Override deaktivieren */
+.usi-gradientbackground #${HELP_BTN_ID}{ position:fixed; bottom:14px; right:14px; }
 
-/* Popover für den Button */
+/* Popover: über dem Button ausklappen (unten rechts ausrichten) */
 #${HELP_POPOVER_ID}{
-  position:fixed; top:46px; right:10px; z-index:2147483647;
+  position:fixed; bottom:56px; right:14px; z-index:2147483647;
   min-width:260px; background:#fff; border:1px solid rgba(0,0,0,.08);
   border-radius:${THEME.radiusSm}; box-shadow:${THEME.shadow}; padding:8px; display:none;
 }
@@ -605,7 +580,6 @@
       if (mute && mute.checked) markSeenToday();
     }
 
-    // Schließen: Button, ESC, Backdrop-Klick & Klick außerhalb
     modal.querySelector(`#${MODAL_ID}-close`).addEventListener("click", close);
     backdrop.addEventListener("click", close);
     modal.addEventListener("click", (e) => { if (!e.target.closest(".dialog")) close(); });
@@ -627,8 +601,8 @@
       btn.type = "button";
       btn.textContent = "Hilfe & Infos";
       btn.addEventListener("click", toggleHelpPopover);
-      const header = document.querySelector(".usi-gradientbackground") || document.documentElement;
-      header.appendChild(btn);
+      // jetzt unabhängig vom Header immer fixed unten rechts
+      document.body.appendChild(btn);
     }
     if (!document.getElementById(HELP_POPOVER_ID)) {
       const pop = document.createElement("div");
@@ -649,13 +623,11 @@
       pop.querySelector(`#${HELP_POPOVER_ID}-openmodal`).addEventListener("click", () => {
         closeHelpPopover(); openModal();
       });
-      // global schließen bei Außenklick
       document.addEventListener("click", (e)=>{
         const t = e.target;
         if (!t.closest(`#${HELP_POPOVER_ID}`) && !t.closest(`#${HELP_BTN_ID}`)) closeHelpPopover();
       }, true);
     }
-    syncPopoverPosition();
   }
   function toggleHelpPopover(){
     const pop = document.getElementById(HELP_POPOVER_ID);
@@ -666,13 +638,17 @@
     const pop = document.getElementById(HELP_POPOVER_ID);
     if (pop) pop.classList.remove("open");
   }
+
+  // Positionierung: Popover oberhalb des (fixen) Buttons, rechtsbündig
   function syncPopoverPosition(){
     const btn = document.getElementById(HELP_BTN_ID);
     const pop = document.getElementById(HELP_POPOVER_ID);
     if (!btn || !pop) return;
     const r = btn.getBoundingClientRect();
-    pop.style.top = (r.bottom + 6 + window.scrollY) + "px";
-    pop.style.right = (Math.max(10, window.innerWidth - r.right) + window.scrollX) + "px";
+    pop.style.top = "auto";
+    pop.style.right = Math.max(14, window.innerWidth - r.right) + "px";
+    // Unterkante des Popovers 56px über der Viewport-Unterkante
+    pop.style.bottom = Math.max(56, window.innerHeight - r.top + 8) + "px";
   }
 
   // öffentlich: Modal manuell öffnen
@@ -695,4 +671,4 @@
     (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
   }
 })();
-
+</script>
