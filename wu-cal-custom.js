@@ -355,13 +355,8 @@
   }, true);
 })(); // IIFE 2
 
-
 /* ============================================================================
-   WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.3
-   Anpassungen:
-   - „Hilfe & Infos“-Button fix nach rechts-unten (sticky beim Scroll).
-   - Popover klappt oberhalb aus (unten rechts ausgerichtet).
-   - „i“-Icon ohne farbige Kachel (Modal & Callout).
+   WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.2
    ============================================================================ */
 (function () {
   const CFG = {
@@ -409,7 +404,7 @@
   };
 
   const MODAL_ID = "wu-info-modal";
-  const STYLE_ID = "wu-info-modal-style-v53";
+  const STYLE_ID = "wu-info-modal-style-v52";
   const HELP_BTN_ID = "wu-help-button";
   const HELP_POPOVER_ID = "wu-help-popover";
 
@@ -493,7 +488,7 @@
 #${MODAL_ID} button.primary{ background:${THEME.primary}; border-color:${THEME.primary}; color:#fff; }
 #${MODAL_ID} button.primary:hover{ background:${THEME.primaryDark}; }
 
-/* --- Fixer "Hilfe & Infos"-Button: unten rechts andocken ----------------- */
+/* --- Fixer "Hilfe & Infos"-Button unten rechts (fixed) ------------------- */
 #${HELP_BTN_ID}{
   position:fixed; bottom:14px; right:14px; z-index:2147483647;
   padding:8px 12px; border-radius:999px; background:${THEME.primary}; color:#fff;
@@ -501,10 +496,10 @@
   box-shadow:0 6px 16px rgba(0,0,0,.18); cursor:pointer; user-select:none;
 }
 #${HELP_BTN_ID}:hover{ background:${THEME.primaryDark}; }
-/* Vorsorglich Header-Override deaktivieren */
+/* Vorsorglicher Header-Override ausschalten (immer fixed) */
 .usi-gradientbackground #${HELP_BTN_ID}{ position:fixed; bottom:14px; right:14px; }
 
-/* Popover: über dem Button ausklappen (unten rechts ausrichten) */
+/* Popover: oberhalb des Buttons, rechtsbündig ausrichten */
 #${HELP_POPOVER_ID}{
   position:fixed; bottom:56px; right:14px; z-index:2147483647;
   min-width:260px; background:#fff; border:1px solid rgba(0,0,0,.08);
@@ -579,6 +574,7 @@
       if (mute && mute.checked) markSeenToday();
     }
 
+    // Schließen: Button, ESC, Backdrop-Klick & Klick außerhalb
     modal.querySelector(`#${MODAL_ID}-close`).addEventListener("click", close);
     backdrop.addEventListener("click", close);
     modal.addEventListener("click", (e) => { if (!e.target.closest(".dialog")) close(); });
@@ -600,7 +596,7 @@
       btn.type = "button";
       btn.textContent = "Hilfe & Infos";
       btn.addEventListener("click", toggleHelpPopover);
-      // jetzt unabhängig vom Header immer fixed unten rechts
+      // fixed unten-rechts
       document.body.appendChild(btn);
     }
     if (!document.getElementById(HELP_POPOVER_ID)) {
@@ -622,11 +618,13 @@
       pop.querySelector(`#${HELP_POPOVER_ID}-openmodal`).addEventListener("click", () => {
         closeHelpPopover(); openModal();
       });
+      // global schließen bei Außenklick
       document.addEventListener("click", (e)=>{
         const t = e.target;
         if (!t.closest(`#${HELP_POPOVER_ID}`) && !t.closest(`#${HELP_BTN_ID}`)) closeHelpPopover();
       }, true);
     }
+    syncPopoverPosition();
   }
   function toggleHelpPopover(){
     const pop = document.getElementById(HELP_POPOVER_ID);
@@ -646,7 +644,7 @@
     const r = btn.getBoundingClientRect();
     pop.style.top = "auto";
     pop.style.right = Math.max(14, window.innerWidth - r.right) + "px";
-    // Unterkante des Popovers 56px über der Viewport-Unterkante
+    // Unterkante des Popovers 56px über der Viewport-Unterkante (sicher über Button)
     pop.style.bottom = Math.max(56, window.innerHeight - r.top + 8) + "px";
   }
 
@@ -670,3 +668,4 @@
     (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
   }
 })();
+
