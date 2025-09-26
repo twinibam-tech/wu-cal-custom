@@ -376,55 +376,108 @@
 
 
 /* ============================================================================
-   NEU: WU – Schönes Hinweis-Popup (Modal) für Kund:innen
-   - Konfiguration unten im CONFIG-Block anpassen.
-   - Öffnet automatisch nach Verzögerung ODER manuell via window.WU_ShowInfoModal().
-   - Optional: "Heute nicht mehr zeigen" dank localStorage (pro Domain).
+   WU – Harmonisches Hinweis-Popup (Modal) – v2
+   - Drop-in Ersatz für dein bisheriges IIFE 3
+   - Ruhige Typografie, stimmige Abstände, dezenter Look
    ============================================================================ */
 (function () {
   const CFG = {
     enabled: true,
     title: "Wichtige Info",
-    // HTML erlaubt – passe Text & Link an:
     html: `
-      <p>Hier findest du unser Handbuch mit allen Schritten zur Buchung:</p>
-      <p><a href="https://example.com/handbuch.pdf" target="_blank" rel="noopener">Handbuch öffnen</a></p>
+      <p>Hier finden Sie unser Handbuch mit allen Schritten zur Buchung:</p>
+      <p><a href="https://swa.wu.ac.at/Serviceeinrichtungen/evd/Documents/VM/Step-by-Step_Stand%2006.11.2024.pdf" target="_blank" rel="noopener">Handbuch herunterladen</a></p>
       <p>Bei Fragen helfen wir gerne weiter: <a href="mailto:service@wu.ac.at">service@wu.ac.at</a></p>
     `,
-    delayMs: 1200,           // Wartezeit nach Seitenaufbau
-    showOncePerDay: true,    // auf true lassen → nicht nerven
-    storageKey: "wu-info-modal-lastSeen", // localStorage-Key
+    delayMs: 900,
+    showOncePerDay: true,
+    storageKey: "wu-info-modal-lastSeen"
   };
-
   if (!CFG.enabled) return;
 
+  // sanfte, einheitliche Design-Tokens
+  const THEME = {
+    primary: "#1b5e20",
+    primaryDark: "#15501b",
+    surface: "#ffffff",
+    surfaceAlt: "#f7faf8",
+    text: "#0a1a12",
+    textMuted: "#415b4d",
+    link: "#145ca8",
+    radiusLg: "14px",
+    radiusSm: "10px",
+    shadow: "0 14px 40px rgba(0,0,0,.18)",
+    blur: "4px"
+  };
+
   const MODAL_ID = "wu-info-modal";
-  const STYLE_ID = "wu-info-modal-style";
+  const STYLE_ID = "wu-info-modal-style-v2";
 
   const CSS = `
-#${MODAL_ID}-backdrop{ position:fixed; inset:0; background:rgba(8,12,14,.38);
-  -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
-  opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:2147483645; }
+/* --- Backdrop ------------------------------------------------------------ */
+#${MODAL_ID}-backdrop{
+  position:fixed; inset:0; background:rgba(10,14,19,.33);
+  -webkit-backdrop-filter:blur(${THEME.blur}); backdrop-filter:blur(${THEME.blur});
+  opacity:0; pointer-events:none; transition:opacity .18s ease;
+  z-index:2147483645;
+}
 #${MODAL_ID}-backdrop.is-open{ opacity:1; pointer-events:auto; }
-#${MODAL_ID}{ position:fixed; inset:0; display:grid; place-items:center; z-index:2147483646;
-  opacity:0; pointer-events:none; transition:opacity .2s ease; }
+
+/* --- Container ----------------------------------------------------------- */
+#${MODAL_ID}{ position:fixed; inset:0; display:grid; place-items:center;
+  z-index:2147483646; opacity:0; pointer-events:none; transition:opacity .18s ease; }
 #${MODAL_ID}.is-open{ opacity:1; pointer-events:auto; }
-#${MODAL_ID} .dialog{ width:min(680px,92vw); background:linear-gradient(180deg,#ffffff, #fbfbfb);
-  border:1px solid rgba(0,0,0,.08); border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.25);
-  overflow:hidden; transform:translateY(6px) scale(.98); transition:transform .22s cubic-bezier(.2,.7,.2,1); }
+
+/* --- Dialog -------------------------------------------------------------- */
+#${MODAL_ID} .dialog{
+  width:min(640px,92vw); background:${THEME.surface}; color:${THEME.text};
+  border:1px solid rgba(0,0,0,.06); border-radius:${THEME.radiusLg};
+  box-shadow:${THEME.shadow}; overflow:hidden;
+  transform:translateY(6px) scale(.98); transition:transform .22s cubic-bezier(.2,.7,.2,1);
+}
 #${MODAL_ID}.is-open .dialog{ transform:translateY(0) scale(1); }
-#${MODAL_ID} .header{ display:flex; align-items:center; gap:10px; padding:16px 18px 10px;
-  background:linear-gradient(180deg,#1b5e20,#1e6b24); color:#fff; }
-#${MODAL_ID} .header .icon{ width:26px; height:26px; border-radius:7px; background:#fff2; display:grid; place-items:center; font-weight:800; }
-#${MODAL_ID} .title{ font:600 18px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
-#${MODAL_ID} .body{ padding:14px 18px 4px; font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial; color:#0b1a11; }
-#${MODAL_ID} .body a{ color:#1864ab; text-underline-offset:2px; }
-#${MODAL_ID} .footer{ display:flex; justify-content:flex-end; gap:10px; padding:14px 18px 18px; background:#f6faf7; }
-#${MODAL_ID} button{ appearance:none; border:1px solid rgba(27,94,32,.25); background:#fff;
-  padding:9px 14px; border-radius:10px; font:600 14px/1 system-ui; cursor:pointer; }
-#${MODAL_ID} button.primary{ background:#1b5e20; color:#fff; border-color:#1b5e20; }
-#${MODAL_ID} .left{ margin-right:auto; display:flex; align-items:center; gap:8px; color:#2d4736; font:13px/1 system-ui; }
+
+/* zarte Akzentoberkante statt harter Vollfläche */
+#${MODAL_ID} .accent{ height:6px; background:linear-gradient(90deg, ${THEME.primary}, ${THEME.primaryDark}); }
+
+/* Kopfbereich */
+#${MODAL_ID} .header{ display:flex; align-items:center; gap:10px; padding:14px 18px 6px; }
+#${MODAL_ID} .icon{ width:26px; height:26px; border-radius:8px;
+  background:${THEME.primary}; color:#fff; display:grid; place-items:center; font-weight:800; }
+#${MODAL_ID} .title{ font:600 18px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+
+/* Inhalt */
+#${MODAL_ID} .body{ padding:8px 18px 2px; font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+#${MODAL_ID} .body p{ margin:0 0 10px; }
+#${MODAL_ID} .body a{ color:${THEME.link}; text-underline-offset:2px; }
+
+/* Fußbereich */
+#${MODAL_ID} .footer{
+  display:flex; align-items:center; gap:10px;
+  padding:12px 18px; background:${THEME.surfaceAlt}; border-top:1px solid rgba(0,0,0,.05);
+  border-bottom-left-radius:${THEME.radiusLg}; border-bottom-right-radius:${THEME.radiusLg};
+}
+#${MODAL_ID} .left{ margin-right:auto; display:inline-flex; align-items:center; gap:8px;
+  color:${THEME.textMuted}; font:13px/1.1 system-ui; }
 #${MODAL_ID} input[type="checkbox"]{ transform:translateY(1px); }
+
+/* Buttons – ruhiger, konsistent */
+#${MODAL_ID} button{
+  appearance:none; border:1px solid rgba(0,0,0,.12); background:#fff; color:${THEME.text};
+  padding:9px 14px; border-radius:${THEME.radiusSm}; font:600 14px/1 system-ui; cursor:pointer;
+  transition:background .15s ease, border-color .15s ease, transform .02s ease;
+}
+#${MODAL_ID} button:hover{ background:#f3f6f4; }
+#${MODAL_ID} button:active{ transform:translateY(1px); }
+#${MODAL_ID} button.primary{
+  background:${THEME.primary}; color:#fff; border-color:${THEME.primary};
+}
+#${MODAL_ID} button.primary:hover{ background:${THEME.primaryDark}; }
+
+/* Motion-Preference respektieren */
+@media (prefers-reduced-motion: reduce) {
+  #${MODAL_ID}-backdrop, #${MODAL_ID}, #${MODAL_ID} .dialog { transition:none !important; }
+}
 `;
 
   function todayKey(){
@@ -433,34 +486,32 @@
   }
   function alreadySeenToday(){
     if (!CFG.showOncePerDay) return false;
-    try { return localStorage.getItem(CFG.storageKey) === todayKey(); } catch(e){ return false; }
+    try { return localStorage.getItem(CFG.storageKey) === todayKey(); } catch { return false; }
   }
   function markSeenToday(){
     if (!CFG.showOncePerDay) return;
-    try { localStorage.setItem(CFG.storageKey, todayKey()); } catch(e){}
+    try { localStorage.setItem(CFG.storageKey, todayKey()); } catch {}
   }
 
   function ensureStyle(){
     if (document.getElementById(STYLE_ID)) return;
     const s = document.createElement("style");
-    s.id = STYLE_ID;
-    s.textContent = CSS;
-    document.head.appendChild(s);
+    s.id = STYLE_ID; s.textContent = CSS; document.head.appendChild(s);
   }
 
   function buildModal(){
     if (document.getElementById(MODAL_ID)) return;
+
     const backdrop = document.createElement("div");
     backdrop.id = MODAL_ID + "-backdrop";
 
     const modal = document.createElement("div");
-    modal.id = MODAL_ID;
-    modal.setAttribute("role","dialog");
-    modal.setAttribute("aria-modal","true");
+    modal.id = MODAL_ID; modal.setAttribute("role","dialog"); modal.setAttribute("aria-modal","true");
     modal.innerHTML = `
       <div class="dialog" role="document">
+        <div class="accent"></div>
         <div class="header">
-          <div class="icon">ℹ️</div>
+          <div class="icon">i</div>
           <div class="title">${CFG.title}</div>
         </div>
         <div class="body">${CFG.html}</div>
@@ -475,41 +526,34 @@
     document.body.appendChild(modal);
 
     function close(){
-      modal.classList.remove("is-open");
-      backdrop.classList.remove("is-open");
+      modal.classList.remove("is-open"); backdrop.classList.remove("is-open");
       const mute = document.getElementById(`${MODAL_ID}-mute`);
       if (mute && mute.checked) markSeenToday();
-      // Fokus freundlich zurück
       setTimeout(()=>{ openerBtn?.focus?.(); }, 0);
     }
-
     modal.querySelector(`#${MODAL_ID}-close`).addEventListener("click", close);
     modal.querySelector(`#${MODAL_ID}-ok`).addEventListener("click", close);
     backdrop.addEventListener("click", close);
     window.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
   }
 
-  let openerBtn = null; // optional: Fokus-Rücksprung
+  let openerBtn = null;
   function openModal(evBtn){
     ensureStyle(); buildModal();
     openerBtn = evBtn || null;
-    const backdrop = document.getElementById(MODAL_ID + "-backdrop");
-    const modal = document.getElementById(MODAL_ID);
-    backdrop.classList.add("is-open");
-    modal.classList.add("is-open");
-    // Fokus in Dialog
-    setTimeout(()=> modal.querySelector("button.primary")?.focus?.(), 40);
+    document.getElementById(MODAL_ID + "-backdrop").classList.add("is-open");
+    document.getElementById(MODAL_ID).classList.add("is-open");
+    setTimeout(()=> document.querySelector(`#${MODAL_ID} button.primary`)?.focus?.(), 40);
   }
 
-  // Globale Helper-Funktion, falls du es manuell öffnen willst:
+  // öffentliche Helper-Funktion
   window.WU_ShowInfoModal = () => openModal();
 
-  // Auto-Öffnen nach Delay (nur, wenn nicht bereits für heute gesehen)
   if (!alreadySeenToday()) {
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", () => setTimeout(() => openModal(), CFG.delayMs));
-    } else {
-      setTimeout(() => openModal(), CFG.delayMs);
-    }
+    const start = () => setTimeout(() => openModal(), CFG.delayMs);
+    (document.readyState === "loading")
+      ? document.addEventListener("DOMContentLoaded", start)
+      : start();
   }
-})(); // IIFE 3
+})();
+
