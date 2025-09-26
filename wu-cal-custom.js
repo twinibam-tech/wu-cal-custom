@@ -376,31 +376,46 @@
 
 
 /* ============================================================================
-   WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5
-   - Schöner, klarer Hinweistext mit Fokus auf Software-Limitierung
-   - CTA-Buttons im Modal
-   - Permanenter Button in der Titelleiste (rechts) inkl. Dropdown
-   - Backdrop-/Außenklick, ESC -> schließen; "Heute nicht mehr zeigen" via localStorage
+   WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.2
+   ---------------------------------------------------------------------------
+   Was macht dieser Block?
+   - Zeigt ein harmonisches Hinweis-Modal mit klarem Fokus:
+     "Aktuell limitiert die eingesetzte Software die Raumdetails."
+   - Deutliche CTAs: "Rauminfo-Tool öffnen" (Primary) & "Handbuch (PDF)".
+   - Klick auf Backdrop / außerhalb, ESC, oder "Schließen" → Modal zu.
+   - "Heute nicht mehr zeigen" speichert das heutige Datum in localStorage
+     (Key: wu-info-modal-lastSeen).
+   - Dauerhafter "Hilfe & Infos"-Button rechts oben mit Dropdown:
+       • Rauminfo-Tool   • Handbuch (PDF)   • Hinweis erneut anzeigen
+     Bleibt bei SPA/Redraws bestehen (MutationObserver).
+   - Globale Helper: window.WU_ShowInfoModal() (öffnet Modal manuell).
+
+   Anpassung:
+   - Text/Links im CFG.html
+   - Farben im THEME.primary / primaryDark
+   - Auto-Delay über CFG.delayMs (ms)
    ============================================================================ */
 (function () {
   const CFG = {
     enabled: true,
     title: "Wichtige Info",
-    // --- Inhalt: harmonisch + Fokus auf Limitierung + CTAs -----------------
     html: `
       <div class="wu-callout">
-        <div class="wu-callout-icon">ℹ️</div>
+        <div class="wu-callout-icon" aria-hidden="true">ℹ️</div>
         <div class="wu-callout-content">
           <div class="wu-callout-title">Aktueller Hinweis</div>
-          <p><strong>Wir sind derzeit durch die eingesetzte Software limitiert</strong> und können in den Räumen noch nicht alle Raumdetails anzeigen.</p>
-          <p>Für vollständige, verlässliche Informationen nutzen Sie bitte unser offizielles <strong>Rauminfo-Tool</strong>.</p>
-          <p>Eine Anleitung zur Verwendung unseres Raumansuchen-Tools finden Sie in unserem Handbuch<strong>Handbuch</strong>:</p>
+          <p><strong>Zurzeit limitiert die eingesetzte Software die Anzeige der Raumdetails.</strong> Bis zum nächsten Update können im Online-Kalender nicht alle Details dargestellt werden.</p>
+          <p><strong>Bitte nutzen Sie für vollständige, verlässliche Informationen:</strong></p>
         </div>
       </div>
 
       <div class="wu-cta-row">
-        <a class="wu-btn wu-btn-primary" href="https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1" target="_blank" rel="noopener">Rauminfo-Tool öffnen</a>
-        <a class="wu-btn" href="https://swa.wu.ac.at/Serviceeinrichtungen/evd/Documents/VM/Step-by-Step_Stand%2006.11.2024.pdf" target="_blank" rel="noopener">Handbuch (PDF)</a>
+        <a class="wu-btn wu-btn-primary" href="https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1" target="_blank" rel="noopener" aria-label="Rauminfo-Tool öffnen">
+          <span class="wu-btn-icon">⌂</span><span class="wu-btn-label">Rauminfo-Tool öffnen</span>
+        </a>
+        <a class="wu-btn" href="https://swa.wu.ac.at/Serviceeinrichtungen/evd/Documents/VM/Step-by-Step_Stand%2006.11.2024.pdf" target="_blank" rel="noopener" aria-label="Handbuch als PDF öffnen">
+          <span class="wu-btn-icon">📄</span><span class="wu-btn-label">Handbuch (PDF)</span>
+        </a>
       </div>
 
       <p class="wu-contact">Fragen? Wir helfen gerne weiter: <a href="mailto:service@wu.ac.at">service@wu.ac.at</a></p>
@@ -427,7 +442,7 @@
   };
 
   const MODAL_ID = "wu-info-modal";
-  const STYLE_ID = "wu-info-modal-style-v5";
+  const STYLE_ID = "wu-info-modal-style-v52";
   const HELP_BTN_ID = "wu-help-button";
   const HELP_POPOVER_ID = "wu-help-popover";
 
@@ -474,12 +489,17 @@
 
 /* CTA-Reihe */
 #${MODAL_ID} .wu-cta-row{ display:flex; flex-wrap:wrap; gap:10px; margin:8px 0 6px; }
-#${MODAL_ID} .wu-btn{ display:inline-block; padding:10px 14px; border:1px solid rgba(0,0,0,.12);
-  border-radius:${THEME.radiusSm}; text-decoration:none; font:600 14px/1 system-ui; background:#fff; color:${THEME.text};
-  transition:background .15s ease,border-color .15s ease,transform .02s ease; }
+#${MODAL_ID} .wu-btn{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 14px; border:1px solid rgba(0,0,0,.12);
+  border-radius:${THEME.radiusSm}; background:#fff; color:${THEME.text} !important;
+  font:600 14px/1 system-ui; text-decoration:none !important; cursor:pointer;
+  transition:background .15s ease,border-color .15s ease,transform .02s ease;
+}
 #${MODAL_ID} .wu-btn:hover{ background:#eef6f7; }
 #${MODAL_ID} .wu-btn:active{ transform:translateY(1px); }
-#${MODAL_ID} .wu-btn-primary{ background:${THEME.primary}; border-color:${THEME.primary}; color:#fff; }
+#${MODAL_ID} .wu-btn-icon{ font-size:16px; line-height:1; }
+#${MODAL_ID} .wu-btn-primary{ background:${THEME.primary}; border-color:${THEME.primary}; color:#fff !important; }
 #${MODAL_ID} .wu-btn-primary:hover{ background:${THEME.primaryDark}; }
 
 /* Footer */
@@ -491,8 +511,12 @@
 #${MODAL_ID} .left{ margin-right:auto; display:inline-flex; align-items:center; gap:8px;
   color:${THEME.textMuted}; font:13px/1.1 system-ui; }
 #${MODAL_ID} input[type="checkbox"]{ transform:translateY(1px); }
-#${MODAL_ID} button{ appearance:none; border:1px solid rgba(0,0,0,.12); background:#fff; color:${THEME.text};
-  padding:9px 14px; border-radius:${THEME.radiusSm}; font:600 14px/1 system-ui; cursor:pointer; }
+
+#${MODAL_ID} button{
+  appearance:none; border:1px solid rgba(0,0,0,.12); background:#fff; color:${THEME.text};
+  padding:9px 14px; border-radius:${THEME.radiusSm}; font:600 14px/1 system-ui; cursor:pointer;
+  transition:background .15s ease, border-color .15s ease, transform .02s ease;
+}
 #${MODAL_ID} button.primary{ background:${THEME.primary}; border-color:${THEME.primary}; color:#fff; }
 #${MODAL_ID} button.primary:hover{ background:${THEME.primaryDark}; }
 
@@ -504,22 +528,24 @@
   box-shadow:0 6px 16px rgba(0,0,0,.18); cursor:pointer; user-select:none;
 }
 #${HELP_BTN_ID}:hover{ background:${THEME.primaryDark}; }
-
-/* Versuche, in die Titelleiste einzuhängen */
 .usi-gradientbackground #${HELP_BTN_ID}{ position:absolute; top:12px; right:16px; }
 
 /* Popover für den Button */
 #${HELP_POPOVER_ID}{
   position:fixed; top:46px; right:10px; z-index:2147483647;
   min-width:260px; background:#fff; border:1px solid rgba(0,0,0,.08);
-  border-radius:${THEME.radiusSm}; box-shadow:${THEME.shadow}; padding:8px;
-  display:none;
+  border-radius:${THEME.radiusSm}; box-shadow:${THEME.shadow}; padding:8px; display:none;
 }
 #${HELP_POPOVER_ID}.open{ display:block; }
-#${HELP_POPOVER_ID} a{ display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px;
-  color:${THEME.text}; text-decoration:none; }
+#${HELP_POPOVER_ID} a{
+  display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px;
+  color:${THEME.text}; text-decoration:none;
+}
 #${HELP_POPOVER_ID} a:hover{ background:${THEME.surfaceAlt}; }
-#${HELP_POPOVER_ID} .accent{ display:inline-grid; place-items:center; width:22px; height:22px; border-radius:6px; background:${THEME.primary}; color:#fff; font-weight:700; }
+#${HELP_POPOVER_ID} .accent{
+  display:inline-grid; place-items:center; width:22px; height:22px; border-radius:6px;
+  background:${THEME.primary}; color:#fff; font-weight:700;
+}
 #${HELP_POPOVER_ID} .sep{ height:1px; background:rgba(0,0,0,.06); margin:6px 0; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -559,7 +585,7 @@
       <div class="dialog" role="document">
         <div class="accent"></div>
         <div class="header">
-          <div class="icon">i</div>
+          <div class="icon" aria-hidden="true">i</div>
           <div class="title">${CFG.title}</div>
         </div>
         <div class="body">${CFG.html}</div>
@@ -579,7 +605,7 @@
       if (mute && mute.checked) markSeenToday();
     }
 
-    // schließen: Button, ESC, Backdrop-Klick & Klick außerhalb
+    // Schließen: Button, ESC, Backdrop-Klick & Klick außerhalb
     modal.querySelector(`#${MODAL_ID}-close`).addEventListener("click", close);
     backdrop.addEventListener("click", close);
     modal.addEventListener("click", (e) => { if (!e.target.closest(".dialog")) close(); });
@@ -601,7 +627,6 @@
       btn.type = "button";
       btn.textContent = "Hilfe & Infos";
       btn.addEventListener("click", toggleHelpPopover);
-      // versuche, in Titelleiste einzuhängen; Fallback: documentElement
       const header = document.querySelector(".usi-gradientbackground") || document.documentElement;
       header.appendChild(btn);
     }
@@ -670,3 +695,4 @@
     (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
   }
 })();
+
