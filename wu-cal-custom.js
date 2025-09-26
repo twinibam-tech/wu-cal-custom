@@ -1,10 +1,34 @@
-/* ===========================================================================
-   WU – V7 (2025-09-23)
-   - Angular Material: „Monat“-Tab zuverlässig ausblenden (div[role="tab"])
-   - Falls „Monat“ aktiv → automatisch auf „Woche“ oder „Tag“ umschalten
-   - Badge rechts oben mit Versionskennung: "V7 SCRIPT AKTIV – HIDE MONTH"
-   - Beibehalt deiner CSS-/UI-Anpassungen + Popover
-   =========================================================================== */
+/* =============================================================================
+   WU – OSB Online Space Booking – Kundenseitiger "One-File"-Injector
+   ---------------------------------------------------------------------------
+   Wozu dieses Skript dient (Kurzfassung für künftige Self-Service-Anfragen):
+   - Läuft als einziges eingebettetes JS auf der WU/OSB-Kalenderseite.
+   - Injiziert CSS/UI-Tweaks (Logo im Header, angepasste Zeitachse, Mobile-Hinweise).
+   - Benennt einmalig den Spaltenkopf "SPACE" zu "Räume" um.
+   - Blendet in Angular-Material Tab-Leisten den Tab „Monat“ zuverlässig aus.
+     * Falls „Monat“ aktiv war, schaltet es automatisch auf „Woche“ (oder „Tag“) um.
+     * Funktioniert auch nach DOM-Redraws dank MutationObserver.
+   - Zeigt kurz einen Badge rechts oben (Version + „HIDE MONTH“) als Sichtbarkeitscheck.
+   - Fügt ein Popover hinzu: Klick auf graue/belegte Kästchen → „Nicht verfügbar“
+     mit sauber ermittelter Zeitspanne (inkl. rechtem Rand 21–22) und Raumbezug.
+   - NEU (Kunden-Info-Popup): Schönes, professionelles Modal-Fenster
+     für frei formulierbare Hinweise inkl. Link (z. B. „Hier findest du unser Handbuch“).
+     * Konfigurierbar: Titel, Text/HTML, Link, Verzögerung, Anzeigeintervall ("einmal pro Tag").
+     * Globale Helper-Funktion: window.WU_ShowInfoModal() zum manuellen Öffnen.
+
+   Hinweise:
+   - Keine Abhängigkeiten. Greift schreibend nur auf document/head/body zu.
+   - Kapselung via IIFEs; Namensräume und IDs beginnen mit "wu-".
+   - Barrierearm: ARIA-Rollen, Escape zum Schließen, Fokuserhalt.
+   - Nichts am Server nötig; rein clientseitig.
+
+   ============================================================================ */
+
+
+/* ============================================================================
+   WU – V8(2025-09-26)
+   - Neues Pop-Up Fenster
+   ============================================================================ */
 
 /* wu-cal-custom.js – CSS-Injection + sichtbarer Badge + "SPACE" -> "Räume" */
 (function () {
@@ -128,7 +152,7 @@
   // Badge mit Versions-Label
   function showBadge(){
     const now = new Date().toLocaleTimeString();
-    const text = `✅ V7 SCRIPT AKTIV – HIDE MONTH – ${now}`;
+    const text = `✅ V8 SCRIPT AKTIV – Pop Up – ${now}`;
     let b = document.getElementById(BADGE_ID);
     if (!b) {
       b = document.createElement("div");
@@ -167,10 +191,10 @@
 
 })(); // IIFE 1
 
-/* ===========================================================================
+/* ============================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
    V7: exakte Zeit inkl. rechter Rand (21–22), robustes X-Clamping
-   =========================================================================== */
+   ============================================================================ */
 (function () {
   const STYLE_ID = "wu-unavail-v7-style";
   const POPOVER_ID = "wu-unavail-popover";
@@ -347,4 +371,145 @@
     const room = getRoomLabel(cell, ev.clientX, ev.clientY);
     openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
   }, true);
-})();
+})(); // IIFE 2
+
+
+
+/* ============================================================================
+   NEU: WU – Schönes Hinweis-Popup (Modal) für Kund:innen
+   - Konfiguration unten im CONFIG-Block anpassen.
+   - Öffnet automatisch nach Verzögerung ODER manuell via window.WU_ShowInfoModal().
+   - Optional: "Heute nicht mehr zeigen" dank localStorage (pro Domain).
+   ============================================================================ */
+(function () {
+  const CFG = {
+    enabled: true,
+    title: "Wichtige Info",
+    // HTML erlaubt – passe Text & Link an:
+    html: `
+      <p>Hier findest du unser Handbuch mit allen Schritten zur Buchung:</p>
+      <p><a href="https://example.com/handbuch.pdf" target="_blank" rel="noopener">Handbuch öffnen</a></p>
+      <p>Bei Fragen helfen wir gerne weiter: <a href="mailto:service@wu.ac.at">service@wu.ac.at</a></p>
+    `,
+    delayMs: 1200,           // Wartezeit nach Seitenaufbau
+    showOncePerDay: true,    // auf true lassen → nicht nerven
+    storageKey: "wu-info-modal-lastSeen", // localStorage-Key
+  };
+
+  if (!CFG.enabled) return;
+
+  const MODAL_ID = "wu-info-modal";
+  const STYLE_ID = "wu-info-modal-style";
+
+  const CSS = `
+#${MODAL_ID}-backdrop{ position:fixed; inset:0; background:rgba(8,12,14,.38);
+  -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
+  opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:2147483645; }
+#${MODAL_ID}-backdrop.is-open{ opacity:1; pointer-events:auto; }
+#${MODAL_ID}{ position:fixed; inset:0; display:grid; place-items:center; z-index:2147483646;
+  opacity:0; pointer-events:none; transition:opacity .2s ease; }
+#${MODAL_ID}.is-open{ opacity:1; pointer-events:auto; }
+#${MODAL_ID} .dialog{ width:min(680px,92vw); background:linear-gradient(180deg,#ffffff, #fbfbfb);
+  border:1px solid rgba(0,0,0,.08); border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+  overflow:hidden; transform:translateY(6px) scale(.98); transition:transform .22s cubic-bezier(.2,.7,.2,1); }
+#${MODAL_ID}.is-open .dialog{ transform:translateY(0) scale(1); }
+#${MODAL_ID} .header{ display:flex; align-items:center; gap:10px; padding:16px 18px 10px;
+  background:linear-gradient(180deg,#1b5e20,#1e6b24); color:#fff; }
+#${MODAL_ID} .header .icon{ width:26px; height:26px; border-radius:7px; background:#fff2; display:grid; place-items:center; font-weight:800; }
+#${MODAL_ID} .title{ font:600 18px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+#${MODAL_ID} .body{ padding:14px 18px 4px; font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial; color:#0b1a11; }
+#${MODAL_ID} .body a{ color:#1864ab; text-underline-offset:2px; }
+#${MODAL_ID} .footer{ display:flex; justify-content:flex-end; gap:10px; padding:14px 18px 18px; background:#f6faf7; }
+#${MODAL_ID} button{ appearance:none; border:1px solid rgba(27,94,32,.25); background:#fff;
+  padding:9px 14px; border-radius:10px; font:600 14px/1 system-ui; cursor:pointer; }
+#${MODAL_ID} button.primary{ background:#1b5e20; color:#fff; border-color:#1b5e20; }
+#${MODAL_ID} .left{ margin-right:auto; display:flex; align-items:center; gap:8px; color:#2d4736; font:13px/1 system-ui; }
+#${MODAL_ID} input[type="checkbox"]{ transform:translateY(1px); }
+`;
+
+  function todayKey(){
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+  function alreadySeenToday(){
+    if (!CFG.showOncePerDay) return false;
+    try { return localStorage.getItem(CFG.storageKey) === todayKey(); } catch(e){ return false; }
+  }
+  function markSeenToday(){
+    if (!CFG.showOncePerDay) return;
+    try { localStorage.setItem(CFG.storageKey, todayKey()); } catch(e){}
+  }
+
+  function ensureStyle(){
+    if (document.getElementById(STYLE_ID)) return;
+    const s = document.createElement("style");
+    s.id = STYLE_ID;
+    s.textContent = CSS;
+    document.head.appendChild(s);
+  }
+
+  function buildModal(){
+    if (document.getElementById(MODAL_ID)) return;
+    const backdrop = document.createElement("div");
+    backdrop.id = MODAL_ID + "-backdrop";
+
+    const modal = document.createElement("div");
+    modal.id = MODAL_ID;
+    modal.setAttribute("role","dialog");
+    modal.setAttribute("aria-modal","true");
+    modal.innerHTML = `
+      <div class="dialog" role="document">
+        <div class="header">
+          <div class="icon">ℹ️</div>
+          <div class="title">${CFG.title}</div>
+        </div>
+        <div class="body">${CFG.html}</div>
+        <div class="footer">
+          <label class="left"><input type="checkbox" id="${MODAL_ID}-mute"> Heute nicht mehr zeigen</label>
+          <button class="secondary" id="${MODAL_ID}-close">Schließen</button>
+          <button class="primary" id="${MODAL_ID}-ok">Ok</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    document.body.appendChild(modal);
+
+    function close(){
+      modal.classList.remove("is-open");
+      backdrop.classList.remove("is-open");
+      const mute = document.getElementById(`${MODAL_ID}-mute`);
+      if (mute && mute.checked) markSeenToday();
+      // Fokus freundlich zurück
+      setTimeout(()=>{ openerBtn?.focus?.(); }, 0);
+    }
+
+    modal.querySelector(`#${MODAL_ID}-close`).addEventListener("click", close);
+    modal.querySelector(`#${MODAL_ID}-ok`).addEventListener("click", close);
+    backdrop.addEventListener("click", close);
+    window.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+  }
+
+  let openerBtn = null; // optional: Fokus-Rücksprung
+  function openModal(evBtn){
+    ensureStyle(); buildModal();
+    openerBtn = evBtn || null;
+    const backdrop = document.getElementById(MODAL_ID + "-backdrop");
+    const modal = document.getElementById(MODAL_ID);
+    backdrop.classList.add("is-open");
+    modal.classList.add("is-open");
+    // Fokus in Dialog
+    setTimeout(()=> modal.querySelector("button.primary")?.focus?.(), 40);
+  }
+
+  // Globale Helper-Funktion, falls du es manuell öffnen willst:
+  window.WU_ShowInfoModal = () => openModal();
+
+  // Auto-Öffnen nach Delay (nur, wenn nicht bereits für heute gesehen)
+  if (!alreadySeenToday()) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => setTimeout(() => openModal(), CFG.delayMs));
+    } else {
+      setTimeout(() => openModal(), CFG.delayMs);
+    }
+  }
+})(); // IIFE 3
