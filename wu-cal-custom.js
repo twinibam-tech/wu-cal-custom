@@ -1,4 +1,3 @@
-<script>
 /* =============================================================================
    WU – OSB Online Space Booking – Kundenseitiger "One-File"-Injector
    ---------------------------------------------------------------------------
@@ -671,4 +670,3 @@
     (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
   }
 })();
-</script>
