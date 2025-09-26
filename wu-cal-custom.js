@@ -376,7 +376,8 @@
 
 
 /* ============================================================================
-   WU – Hinweis-Popup (Modal) – türkis, harmonisch – v3
+   WU – Hinweis-Popup (Modal) – türkis, harmonisch – v4.1
+   - Klick außerhalb des Dialogs schließt jetzt zuverlässig.
    ============================================================================ */
 (function () {
   const CFG = {
@@ -385,6 +386,8 @@
     html: `
       <p>Hier finden Sie unser Handbuch mit allen Schritten zur Buchung:</p>
       <p><a href="https://swa.wu.ac.at/Serviceeinrichtungen/evd/Documents/VM/Step-by-Step_Stand%2006.11.2024.pdf" target="_blank" rel="noopener">Handbuch herunterladen</a></p>
+      <p>Wir arbeiten noch mit der Software und können nicht alle Raumdetails anzeigen.<br>
+      Alle detaillierten Infos zu den Räumen finden Sie in unserem <a href="https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1" target="_blank" rel="noopener">Rauminfo-Tool</a>.</p>
       <p>Bei Fragen helfen wir gerne weiter: <a href="mailto:service@wu.ac.at">service@wu.ac.at</a></p>
     `,
     delayMs: 900,
@@ -393,9 +396,8 @@
   };
   if (!CFG.enabled) return;
 
-  // Farben/Design zentral (leicht anpassbar):
   const THEME = {
-    primary: "#0f6e85",      // türkiser Akzent (ggf. an WU-Farbe anpassen)
+    primary: "#0f6e85",
     primaryDark: "#0d5f73",
     surface: "#ffffff",
     surfaceAlt: "#f5f9f9",
@@ -409,7 +411,7 @@
   };
 
   const MODAL_ID = "wu-info-modal";
-  const STYLE_ID = "wu-info-modal-style-v3";
+  const STYLE_ID = "wu-info-modal-style-v41";
 
   const CSS = `
 #${MODAL_ID}-backdrop{
@@ -432,7 +434,6 @@
 #${MODAL_ID}.is-open .dialog{ transform:translateY(0) scale(1); }
 
 #${MODAL_ID} .accent{ height:6px; background:linear-gradient(90deg, ${THEME.primary}, ${THEME.primaryDark}); }
-
 #${MODAL_ID} .header{ display:flex; align-items:center; gap:10px; padding:14px 18px 6px; }
 #${MODAL_ID} .icon{ width:26px; height:26px; border-radius:8px; background:${THEME.primary};
   color:#fff; display:grid; place-items:center; font-weight:800; }
@@ -517,10 +518,10 @@
       setTimeout(()=>{ openerBtn?.focus?.(); }, 0);
     }
 
-    // Buttons: nur „Schließen“
+    // ✅ schließen: Button, ESC, Backdrop-Klick, UND Klick außerhalb der .dialog
     modal.querySelector(`#${MODAL_ID}-close`).addEventListener("click", close);
-    // ESC oder Klick außerhalb schließt ebenfalls:
     backdrop.addEventListener("click", close);
+    modal.addEventListener("click", (e) => { if (!e.target.closest(".dialog")) close(); });
     window.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
   }
 
@@ -533,7 +534,7 @@
     setTimeout(()=> document.querySelector(`#${MODAL_ID} button.primary`)?.focus?.(), 40);
   }
 
-  // Öffnen per Konsole/Code: WU_ShowInfoModal()
+  // öffentlich zum manuellen Öffnen
   window.WU_ShowInfoModal = () => openModal();
 
   if (!alreadySeenToday()) {
@@ -541,5 +542,3 @@
     (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
   }
 })();
-
-
