@@ -624,39 +624,51 @@
   }
   })();
 /* ============================================================================
-   WU – WU-Logo links als Home-Button (ohne feste URL, geht zu origin/)
+   WU – WU-Logo links als Home-Button (geht zu location.origin + '/')
    ============================================================================ */
 (function () {
-  const CANDIDATES = [
-    'header a[href], .navbar a[href]',
-    'header .logo a[href]',
-    'header img[alt*="WU"]',
-    '.usi-gradientbackground a[href]'
+  const SELECTORS = [
+    '.usi-headerModuleWrapper .usi-companyLogo img',
+    '.usi-headerModuleWrapper .usi-companyLogo',
+    '.usi-companyLogo img',
+    '.usi-companyLogo',
+    'img[alt*="WU" i]'
   ];
 
-  function attach(){
-    let node = null;
-    for (const sel of CANDIDATES){
-      const el = document.querySelector(sel);
-      if (el && el.offsetParent !== null){ node = el; break; }
-    }
-    if (!node) return;
-    const target = (node.tagName === 'IMG' ? node.closest('a') : node) || node;
+  function goHome(ev){
+    if (ev.type === 'keydown' && ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault();
+    location.replace(location.origin + '/'); // kein extra History-Eintrag
+  }
+
+  function bind(node){
+    const target = node.closest('.usi-companyLogo') || node;
     if (!target || target.__wuHomeBound) return;
     target.__wuHomeBound = true;
 
+    // klick- & tastaturbedienbar machen
     target.style.cursor = 'pointer';
-    target.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      const url = location.origin + '/';
-      location.replace(url); // kein History-Eintrag
-    });
+    target.setAttribute('role', 'link');
+    target.setAttribute('tabindex', '0');
+    target.setAttribute('title', 'Zur Startseite');
+
+    target.addEventListener('click', goHome, true);
+    target.addEventListener('keydown', goHome, true);
+  }
+
+  function attach(){
+    for (const sel of SELECTORS){
+      const el = document.querySelector(sel);
+      if (el){ bind(el); return; }
+    }
   }
 
   (document.readyState === 'loading')
     ? document.addEventListener('DOMContentLoaded', attach)
     : attach();
 
-  new MutationObserver(attach).observe(document.documentElement, {childList:true, subtree:true});
-})(); // IIFE 4
-
+  new MutationObserver(attach).observe(document.documentElement, {
+    childList: true,
+    subtree: true
+  });
+})();
