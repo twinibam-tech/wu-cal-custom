@@ -624,10 +624,12 @@
   }
   })();
 /* ============================================================================
-   WU – WU-Logo links als Home-Button (geht zu location.origin + '/')
+   WU – WU-Logo als Home-Button: klickt den besten Header-Link (z. B. "Raumanfrage")
+   statt auf eine fixe URL zu navigieren. Fallbacks enthalten.
    ============================================================================ */
 (function () {
-  const SELECTORS = [
+  // 1) Kandidaten für das Logo (bei euch .usi-companyLogo > img)
+  const LOGO_SELECTORS = [
     '.usi-headerModuleWrapper .usi-companyLogo img',
     '.usi-headerModuleWrapper .usi-companyLogo',
     '.usi-companyLogo img',
@@ -635,29 +637,90 @@
     'img[alt*="WU" i]'
   ];
 
+  // 2) So suchen wir den "Home"-Link im Header/Nav
+  const LINK_SELECTORS = [
+    '.usi-headerModuleWrapper a[href]',
+    'header a[href]',
+    'nav a[href]'
+  ];
+  const TEXT_PREFER = /(raumanfrage|raumsuche|räume|rooms|home|start)/i;
+  const TEXT_DEPRIORITIZE = /(logout|abmelden|handbuch|pdf|hilfe|kontakt)/i;
+
+  function pickHomeLink(){
+    // sammle alle Links aus den Header-Bereichen
+    const links = [];
+    for (const sel of LINK_SELECTORS) {
+      document.querySelectorAll(sel).forEach(a => links.push(a));
+    }
+    // filtern: nur sichtbare, klickbare, http/relative, gleiche Origin falls absolut
+    const clean = links.filter(a => {
+      if (!a || a.offsetParent === null) return false;
+      const href = (a.getAttribute('href') || '').trim();
+      if (!href) return false;
+      if (href.startsWith('mailto:') || href.startsWith('tel:')) return false;
+      if (/^https?:\/\//i.test(href) && new URL(href, location.href).origin !== location.origin) return false;
+      return true;
+    });
+
+    if (!clean.length) return null;
+
+    // scoren: Bevorzugt passende Bezeichnungen, kürzere Pfade, keine Depriorisierten
+    function score(a){
+      const text = (a.textContent || a.getAttribute('title') || '').trim();
+      const href = a.getAttribute('href') || '';
+      let s = 0;
+      if (TEXT_PREFER.test(text) || TEXT_PREFER.test(href)) s += 5;
+      if (TEXT_DEPRIORITIZE.test(text) || TEXT_DEPRIORITIZE.test(href)) s -= 5;
+      // kurze, „zentrale“ Ziele bevorzugen
+      try {
+        const u = new URL(href, location.href);
+        const pathLen = (u.pathname || '/').split('/').filter(Boolean).length;
+        if (pathLen <= 2) s += 2;
+        if (/(^\/?$|^\/prod\/?$|^\/#\/?$)/i.test(u.pathname + u.hash)) s += 1;
+      } catch {}
+      return s;
+    }
+
+    clean.sort((a,b) => score(b) - score(a));
+    return clean[0] || null;
+  }
+
   function goHome(ev){
+    // Klick oder Enter/Space
     if (ev.type === 'keydown' && ev.key !== 'Enter' && ev.key !== ' ') return;
     ev.preventDefault();
-    location.replace(location.origin + '/'); // kein extra History-Eintrag
+
+    const best = pickHomeLink();
+    if (best) {
+      // Simuliere einen echten Klick, damit die SPA/Router-Logik greift
+      best.click();
+      return;
+    }
+
+    // Fallbacks falls kein Link gefunden:
+    // 1) Versuche die aktuelle Basis (z. B. '/prod')
+    const base = location.pathname.split('/').filter(Boolean);
+    const rootPath = base.length ? '/' + base[0] + '/' : '/';
+    try { location.replace(rootPath); return; } catch {}
+
+    // 2) letzter Notnagel: origin/
+    location.replace(location.origin + '/');
   }
 
   function bind(node){
     const target = node.closest('.usi-companyLogo') || node;
     if (!target || target.__wuHomeBound) return;
     target.__wuHomeBound = true;
-
-    // klick- & tastaturbedienbar machen
     target.style.cursor = 'pointer';
     target.setAttribute('role', 'link');
     target.setAttribute('tabindex', '0');
     target.setAttribute('title', 'Zur Startseite');
-
     target.addEventListener('click', goHome, true);
     target.addEventListener('keydown', goHome, true);
   }
 
   function attach(){
-    for (const sel of SELECTORS){
+    for (const sel of LOGO_SELECTORS){
       const el = document.querySelector(sel);
       if (el){ bind(el); return; }
     }
@@ -667,8 +730,6 @@
     ? document.addEventListener('DOMContentLoaded', attach)
     : attach();
 
-  new MutationObserver(attach).observe(document.documentElement, {
-    childList: true,
-    subtree: true
-  });
+  new MutationObserver(attach).observe(document.documentElement, {childList:true, subtree:true});
 })();
+
