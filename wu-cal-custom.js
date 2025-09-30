@@ -718,170 +718,77 @@
 })();
 
 /* ============================================================================
-   Bilder rausklicken
-   ============================================================================ */
-
-(function () {
-  const IMG_STYLE_ID = "wu-image-viewer-css";
-  const BACKDROP_ID  = "wu-imgv-backdrop";
-
-  const CSS = `
-#${BACKDROP_ID}{position:fixed;inset:0;background:rgba(0,0,0,.72);
-  display:none;align-items:center;justify-content:center;z-index:2147483640;}
-#${BACKDROP_ID}.open{display:flex;}
-#wu-imgv{position:relative;max-width:96vw;max-height:96vh;}
-#wu-imgv img{max-width:96vw;max-height:96vh;display:block;border-radius:10px;
-  box-shadow:0 12px 36px rgba(0,0,0,.45);}
-#wu-imgv .close{position:absolute;top:8px;right:8px;line-height:1;padding:8px 10px;
-  border-radius:8px;background:rgba(0,0,0,.55);color:#fff;border:none;font:600 13px system-ui;cursor:pointer}
-#wu-imgv .close:hover{background:rgba(0,0,0,.75)}
-`;
-
-  function ensureImgStyle(){
-    if(!document.getElementById(IMG_STYLE_ID)){
-      const s = document.createElement("style");
-      s.id = IMG_STYLE_ID; s.textContent = CSS; document.head.appendChild(s);
-    }
-  }
-  function ensureImgDom(){
-    if(document.getElementById(BACKDROP_ID)) return;
-    const b = document.createElement("div");
-    b.id = BACKDROP_ID;
-    b.innerHTML = `
-      <div id="wu-imgv" role="dialog" aria-modal="true">
-        <button class="close" aria-label="Schließen">×</button>
-        <img alt="">
-      </div>`;
-    document.body.appendChild(b);
-
-    // „Klick neben dem Bild“ => schließen (Capturing, damit es immer greift)
-    b.addEventListener("click", e => {
-      if (!e.target.closest("#wu-imgv img, #wu-imgv .close")) imgClose();
-    }, true);
-
-    b.querySelector(".close").addEventListener("click", imgClose);
-    window.addEventListener("keydown", e => { if (e.key === "Escape") imgClose(); });
-    window.addEventListener("scroll",  () => imgClose(), {passive:true});
-    window.addEventListener("popstate",() => imgClose());
-  }
-
-  function imgOpen(src, alt){
-    ensureImgStyle(); ensureImgDom();
-    const bd  = document.getElementById(BACKDROP_ID);
-    const img = bd.querySelector("img");
-    img.src = src; img.alt = alt || "";
-    bd.classList.add("open");
-  }
-  function imgClose(){
-    const bd = document.getElementById(BACKDROP_ID);
-    if (!bd) return;
-    bd.classList.remove("open");
-    const img = bd.querySelector("img");
-    if (img) img.removeAttribute("src");
-  }
-
-  // --- Bilderkennung robuster machen ---------------------------------------
-  function looksLikeImageUrl(url){
-    if (!url) return false;
-    // klassische Endungen
-    if (/\.(jpe?g|png|webp|gif|svg)(\?.*)?$/i.test(url)) return true;
-    // typische CMS/Imageserver, Blob/Data-URLs
-    if (/image(server)?\/?getimage/i.test(url)) return true;
-    if (/^blob:|^data:image\//i.test(url)) return true;
-    return false;
-  }
-
-  // --- Delegation: Links auf Bilddateien ODER direkt auf <img> --------------
-  // Opt-in/Opt-out: setze ALL_IMGS_CLICKABLE = true, wenn jedes <img> zoomen soll.
-  const ALL_IMGS_CLICKABLE = true;
-
-  document.addEventListener("click", function(e){
-    // 1) Link, der auf ein Bild zeigt (auch ohne Endung)
-    const a = e.target.closest('a[href]');
-    if (a) {
-      const href = a.getAttribute('href');
-      const hasImgChild = !!a.querySelector('img');
-      if (looksLikeImageUrl(href) && hasImgChild) {
-        e.preventDefault();
-        const abs = new URL(href, location.href).href;
-        imgOpen(abs, a.getAttribute('aria-label') || a.title || "");
-        return;
-      }
-    }
-    // 2) Direkt auf ein <img> klicken
-    const img = e.target.closest('img');
-    if (img && !img.closest(`#${BACKDROP_ID}`)) {
-      if (img.dataset.noviewer === "1") return;                 // Opt-out
-      if (!ALL_IMGS_CLICKABLE && img.dataset.viewer !== "1") return; // alter Opt-in
-      e.preventDefault();
-      imgOpen(img.currentSrc || img.src, img.alt || "");
-    }
-  }, true);
-
-  // global verfügbar (optional)
-  window.WU_ImageViewer = { open: imgOpen, close: imgClose };
-})();
-
-/* ============================================================================
-   System-Lightbox abwürgen + bei Außenklick schließen
+   System-Foto/Lightbox sicher schließen bei Außenklick – ohne globale Hooks
    ============================================================================ */
 (function () {
-  // Bekannte Container / Close-Buttons / Backdrops (Angular/Bootstrap/MD/USI)
-  const CONTAINER_SEL = [
-    '.cdk-overlay-pane mat-dialog-container',
+  // Backdrops/Container der eingebauten Viewer (Material/Bootstrap/USI)
+  const BACKDROPS = [
+    '.cdk-overlay-backdrop',           // Angular Material
+    '.mdc-dialog__scrim',              // MDC
+    '.modal-backdrop.show',            // Bootstrap
+    '.usi-op-imageViewerBackdrop',     // USI/Ungerboeck (dunkler Bereich)
+    '.usi-op-imageViewer-backdrop'
+  ];
+  const CONTAINERS = [
     '.cdk-overlay-pane .mat-mdc-dialog-container',
     '.mdc-dialog .mdc-dialog__container',
     '.modal.show',
-    '.usi-op-imageViewerContainer, .usi-op-imageViewer'
-  ].join(',');
-  const CLOSE_BTN_SEL = [
-    '[aria-label*="schließ" i]','[aria-label*="close" i]',
-    '.mdc-icon-button','button.close','button[mat-dialog-close]'
-  ].join(',');
-  const BACKDROP_SEL = [
-    '.cdk-overlay-backdrop','._mat-animation-noopable.cdk-overlay-backdrop',
-    '.mdc-dialog__scrim','.modal-backdrop.show',
-    '.usi-op-imageViewerBackdrop, .usi-op-imageViewer-backdrop'
-  ].join(',');
+    '.usi-op-imageViewerContainer',    // Bildcontainer
+    '.usi-op-imageViewer'
+  ];
+  const CLOSE_BTNS = [
+    '[aria-label*="schließ" i]',
+    '[aria-label*="close" i]',
+    'button[mat-dialog-close]',
+    'button.close',
+    '.mdc-icon-button'
+  ];
 
-  function qSelAll(sel){ return Array.from(document.querySelectorAll(sel)); }
-  function anyVisible(els){ return els.find(el => !!(el.offsetParent || el.getClientRects().length)); }
+  const SEL_BACKDROP  = BACKDROPS.join(',');
+  const SEL_CONTAINER = CONTAINERS.join(',');
+  const SEL_CLOSEBTN  = CLOSE_BTNS.join(',');
 
-  function isSystemViewerOpen(){
-    return !!anyVisible(qSelAll(CONTAINER_SEL)) || !!anyVisible(qSelAll(BACKDROP_SEL));
-  }
-
-  function closeSystemViewer(){
-    // 1) Close Buttons
+  function closeViewer(root){
     let did = false;
-    qSelAll(CONTAINER_SEL).forEach(c=>{
-      const btn = c.querySelector(CLOSE_BTN_SEL);
-      if (btn){ btn.click(); did = true; }
-    });
-    // 2) Backdrops anklicken
-    qSelAll(BACKDROP_SEL).forEach(b=>{ b.click(); did = true; });
-    // 3) Notnagel: ESC feuern (manche Dialoge hören darauf)
-    const esc = new KeyboardEvent('keydown', {key:'Escape', bubbles:true});
-    window.dispatchEvent(esc);
+    // 1) Falls es einen Close-Button gibt → klicken
+    (root.querySelector(SEL_CLOSEBTN) || document.querySelector(SEL_CLOSEBTN))?.click?.() && (did = true);
+    // 2) ESC als Fallback
+    window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
     return did;
   }
 
-  // Außenklick = Systemviewer schließen
-  document.addEventListener('click', (e)=>{
-    if (!isSystemViewerOpen()) return;
-    // Wenn außerhalb der Dialog-Box geklickt -> schließen
-    const inside = e.target.closest(CONTAINER_SEL);
-    if (!inside){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      closeSystemViewer();
+  // Klick genau auf die Backdrop-Elemente schließt – sonst nichts anfassen
+  function bindBackdrop(el){
+    if (!el || el.__wuBound) return;
+    el.__wuBound = true;
+    el.addEventListener('click', () => closeViewer(el), {passive:true});
+  }
+
+  // Falls es keinen Backdrop gibt (manche Viewer), klick außerhalb des Bildes im Container
+  function bindContainer(el){
+    if (!el || el.__wuBound) return;
+    el.__wuBound = true;
+    el.addEventListener('click', (e) => {
+      const clickedInsideMedia = e.target.closest('img, video, picture, .mdc-dialog__surface, .mat-mdc-dialog-surface');
+      if (!clickedInsideMedia) closeViewer(el);
+    }, {capture:true});
+  }
+
+  // Initial binden (falls schon offen)
+  document.querySelectorAll(SEL_BACKDROP).forEach(bindBackdrop);
+  document.querySelectorAll(SEL_CONTAINER).forEach(bindContainer);
+
+  // Später auftauchende Overlays beobachten
+  new MutationObserver((muts)=>{
+    for (const m of muts) {
+      m.addedNodes.forEach(n => {
+        if (!(n instanceof HTMLElement)) return;
+        if (n.matches?.(SEL_BACKDROP))  bindBackdrop(n);
+        if (n.matches?.(SEL_CONTAINER)) bindContainer(n);
+        // auch in Tiefe suchen
+        n.querySelectorAll?.(SEL_BACKDROP).forEach(bindBackdrop);
+        n.querySelectorAll?.(SEL_CONTAINER).forEach(bindContainer);
+      });
     }
-  }, true);
-
-  // Vor dem Öffnen unseres Viewers: vorhandene Systemviewer schließen
-  // -> Einfach globale Hook-Funktion bereitstellen, die du vor imgOpen() aufrufst
-  window.WU_CloseNativeViewers = closeSystemViewer;
-
-  // Optional: beim Seitenwechsel/Back sofort schließen
-  window.addEventListener('popstate', closeSystemViewer);
+  }).observe(document.documentElement, {childList:true, subtree:true});
 })();
