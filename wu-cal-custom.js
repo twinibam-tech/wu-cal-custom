@@ -135,34 +135,7 @@
       }
     });
   }
-
-  function showBadge(){
-    const now = new Date().toLocaleTimeString();
-    const text = `✅ V8 SCRIPT AKTIV – Pop Up – ${now}`;
-    let b = document.getElementById(BADGE_ID);
-    if (!b) {
-      b = document.createElement("div");
-      b.id = BADGE_ID;
-      Object.assign(b.style, {
-        position:"fixed", top:"12px", right:"12px", zIndex:999999,
-        padding:"8px 10px",
-        font:"14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial",
-        background:"#1b5e20", color:"#fff", borderRadius:"6px",
-        boxShadow:"0 2px 8px rgba(0,0,0,.15)"
-      });
-      document.documentElement.appendChild(b);
-    }
-    b.textContent = text;
-    setTimeout(() => b.remove(), 6000);
-  }
-
-  function applyAll(){
-    injectStyle();
-    renameSpaceOnce();
-    hideMonthTabAndSwitch();
-    showBadge();
-  }
-
+   
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", applyAll);
   } else {
@@ -667,5 +640,44 @@
     const start = () => setTimeout(() => openModal(), CFG.delayMs);
     (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
   }
+
+     const CANDIDATES = [
+    'header a[href], .navbar a[href]',          // häufigstes Muster
+    'header .logo a[href]',
+    'header img[alt*="WU"]',                    // falls das Logo nur ein <img> ist
+    '.usi-gradientbackground a[href]'           // Fallback
+  ];
+
+  function attach(){
+    // Nimm das erste passende Element, das sichtbar ist und im Header liegt
+    let node = null;
+    for (const sel of CANDIDATES){
+      const el = document.querySelector(sel);
+      if (el && el.offsetParent !== null){ node = el; break; }
+    }
+    if (!node) return;
+
+    // Wenn es ein <img> ist, versuche den umgebenden Link zu nehmen
+    const target = (node.tagName === 'IMG' ? node.closest('a') : node) || node;
+    if (!target || target.__wuHomeBound) return;  // nur einmal binden
+    target.__wuHomeBound = true;
+
+    // Optik & Verhalten
+    target.style.cursor = 'pointer';
+    target.addEventListener('click', (ev) => {
+      // immer zur „Root“ des aktuellen Origins, ohne Nutzer-spezifische Links zu kennen
+      ev.preventDefault();
+      const url = location.origin + '/';
+      // replace = kein zusätzlicher History-Eintrag
+      location.replace(url);
+    });
+  }
+
+  // Init + Robustheit bei SPA-Redraws
+  (document.readyState === 'loading')
+    ? document.addEventListener('DOMContentLoaded', attach)
+    : attach();
+
+  new MutationObserver(attach).observe(document.documentElement, {childList:true, subtree:true});
 })();
 
