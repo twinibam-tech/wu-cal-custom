@@ -1,29 +1,14 @@
 /* =============================================================================
    WU – OSB Online Space Booking – Kundenseitiger "One-File"-Injector
-   ---------------------------------------------------------------------------
-   Wozu dieses Skript dient (Kurzfassung für künftige Self-Service-Anfragen):
-   - Läuft als einziges eingebettetes JS auf der WU/OSB-Kalenderseite.
-   - Injiziert CSS/UI-Tweaks (Logo im Header, angepasste Zeitachse, Mobile-Hinweise).
-   - Benennt einmalig den Spaltenkopf "SPACE" zu "Räume" um.
-   - Blendet in Angular-Material Tab-Leisten den Tab „Monat“ zuverlässig aus.
-     * Falls „Monat“ aktiv war, schaltet es automatisch auf „Woche“ (oder „Tag“) um.
-     * Funktioniert auch nach DOM-Redraws dank MutationObserver.
-   - Zeigt kurz einen Badge rechts oben (Version + „HIDE MONTH“) als Sichtbarkeitscheck.
-   - Fügt ein Popover hinzu: Klick auf graue/belegte Kästchen → „Nicht verfügbar“
-     mit sauber ermittelter Zeitspanne (inkl. rechtem Rand 21–22) und Raumbezug.
-   - Kunden-Info-Popup (Modal) inkl. fester „Hilfe & Infos“-Schaltfläche.
    ============================================================================ */
-
 
 /* ============================================================================
-   WU – V8(2025-09-26)
-   - Neues Pop-Up Fenster
+   WU – V8 (2025-09-26) – Neues Pop-Up Fenster
    ============================================================================ */
 
-/* wu-cal-custom.js – CSS-Injection + sichtbarer Badge + "SPACE" -> "Räume" */
+/* wu-cal-custom.js – CSS-Injection + "SPACE" -> "Räume" (ohne Badge) */
 (function () {
   const STYLE_ID = "wu-inline-css";
-  const BADGE_ID = "wu-inline-badge";
 
   const CSS = `
 /* Header-Logo leicht nach innen & responsive */
@@ -135,7 +120,13 @@
       }
     });
   }
-   
+
+  function applyAll(){
+    injectStyle();
+    renameSpaceOnce();
+    hideMonthTabAndSwitch();
+  }
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", applyAll);
   } else {
@@ -146,13 +137,12 @@
     renameSpaceOnce();
     hideMonthTabAndSwitch();
   }).observe(document.documentElement, {subtree:true, childList:true});
-
 })(); // IIFE 1
 
 
+
 /* ============================================================================
-   WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
-   V7: exakte Zeit inkl. rechter Rand (21–22), robustes X-Clamping
+   WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar" (v7)
    ============================================================================ */
 (function () {
   const STYLE_ID = "wu-unavail-v7-style";
@@ -328,6 +318,8 @@
   }, true);
 })(); // IIFE 2
 
+
+
 /* ============================================================================
    WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.2
    ============================================================================ */
@@ -382,7 +374,6 @@
   const HELP_POPOVER_ID = "wu-help-popover";
 
   const CSS = `
-/* --- Backdrop ------------------------------------------------------------ */
 #${MODAL_ID}-backdrop{
   position:fixed; inset:0; background:rgba(8,28,33,.36);
   -webkit-backdrop-filter:blur(${THEME.blur}); backdrop-filter:blur(${THEME.blur});
@@ -390,7 +381,6 @@
 }
 #${MODAL_ID}-backdrop.is-open{ opacity:1; pointer-events:auto; }
 
-/* --- Container & Dialog -------------------------------------------------- */
 #${MODAL_ID}{ position:fixed; inset:0; display:grid; place-items:center;
   z-index:2147483646; opacity:0; pointer-events:none; transition:opacity .18s ease; }
 #${MODAL_ID}.is-open{ opacity:1; pointer-events:auto; }
@@ -406,11 +396,7 @@
 #${MODAL_ID} .accent{ height:6px; background:linear-gradient(90deg, ${THEME.primary}, ${THEME.primaryDark}); }
 
 #${MODAL_ID} .header{ display:flex; align-items:center; gap:10px; padding:14px 18px 6px; }
-/* Icon ohne farbige Kachel */
-#${MODAL_ID} .icon{
-  width:auto; height:auto; border-radius:0; background:transparent; padding:0;
-  color:${THEME.primary}; font:700 18px/1 system-ui;
-}
+#${MODAL_ID} .icon{ width:auto; height:auto; background:transparent; color:${THEME.primary}; font:700 18px/1 system-ui; }
 #${MODAL_ID} .title{ font:600 18px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
 
 #${MODAL_ID} .body{ padding:8px 18px 8px; font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
@@ -418,81 +404,42 @@
 #${MODAL_ID} .body p{ margin:0 0 10px; }
 #${MODAL_ID} .body .wu-contact{ color:${THEME.textMuted}; margin-top:12px; }
 
-/* Callout-Stil */
-#${MODAL_ID} .wu-callout{ display:flex; gap:12px; padding:12px; background:${THEME.surfaceAlt};
-  border:1px solid rgba(0,0,0,.06); border-radius:${THEME.radiusSm}; margin:2px 0 12px; }
-/* Callout-Icon ohne Kachel */
-#${MODAL_ID} .wu-callout-icon{
-  width:auto; height:auto; border-radius:0; background:transparent; padding:0;
-  color:${THEME.primary}; font:700 18px/1 system-ui; flex:0 0 auto;
-}
-#${MODAL_ID} .wu-callout-title{ font-weight:700; margin-bottom:6px; }
+#${MODAL_ID} .wu-callout{ display:flex; gap:12px; padding:12px; background:${TH
+EME.surfaceAlt};
+  border:1px solid rgba(0,0,0,.06); border-radius:10px; margin:2px 0 12px; }
 
-/* CTA-Reihe */
 #${MODAL_ID} .wu-cta-row{ display:flex; flex-wrap:wrap; gap:10px; margin:8px 0 6px; }
 #${MODAL_ID} .wu-btn{
-  display:inline-flex; align-items:center; gap:8px;
-  padding:10px 14px; border:1px solid rgba(0,0,0,.12);
-  border-radius:${THEME.radiusSm}; background:#fff; color:${THEME.text} !important;
-  font:600 14px/1 system-ui; text-decoration:none !important; cursor:pointer;
-  transition:background .15s ease,border-color .15s ease,transform .02s ease;
+  display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid rgba(0,0,0,.12);
+  border-radius:10px; background:#fff; color:${THEME.text} !important; font:600 14px/1 system-ui;
+  text-decoration:none !important; cursor:pointer; transition:background .15s ease,border-color .15s ease,transform .02s ease;
 }
 #${MODAL_ID} .wu-btn:hover{ background:#eef6f7; }
 #${MODAL_ID} .wu-btn:active{ transform:translateY(1px); }
-#${MODAL_ID} .wu-btn-icon{ font-size:16px; line-height:1; }
 #${MODAL_ID} .wu-btn-primary{ background:${THEME.primary}; border-color:${THEME.primary}; color:#fff !important; }
 #${MODAL_ID} .wu-btn-primary:hover{ background:${THEME.primaryDark}; }
 
-/* Footer */
-#${MODAL_ID} .footer{
-  display:flex; align-items:center; gap:10px; padding:12px 18px;
-  background:${THEME.surfaceAlt}; border-top:1px solid rgba(0,0,0,.05);
-  border-bottom-left-radius:${THEME.radiusLg}; border-bottom-right-radius:${THEME.radiusLg};
-}
-#${MODAL_ID} .left{ margin-right:auto; display:inline-flex; align-items:center; gap:8px;
-  color:${THEME.textMuted}; font:13px/1.1 system-ui; }
-#${MODAL_ID} input[type="checkbox"]{ transform:translateY(1px); }
-
-#${MODAL_ID} button{
-  appearance:none; border:1px solid rgba(0,0,0,.12); background:#fff; color:${THEME.text};
-  padding:9px 14px; border-radius:${THEME.radiusSm}; font:600 14px/1 system-ui; cursor:pointer;
-  transition:background .15s ease, border-color .15s ease, transform .02s ease;
-}
+#${MODAL_ID} .footer{ display:flex; align-items:center; gap:10px; padding:12px 18px;
+  background:${THEME.surfaceAlt}; border-top:1px solid rgba(0,0,0,.05); }
+#${MODAL_ID} .left{ margin-right:auto; display:inline-flex; align-items:center; gap:8px; color:${THEME.textMuted}; font:13px/1.1 system-ui; }
+#${MODAL_ID} button{ appearance:none; border:1px solid rgba(0,0,0,.12); background:#fff; color:${THEME.text};
+  padding:9px 14px; border-radius:10px; font:600 14px/1 system-ui; cursor:pointer; transition:background .15s ease, border-color .15s ease, transform .02s ease; }
 #${MODAL_ID} button.primary{ background:${THEME.primary}; border-color:${THEME.primary}; color:#fff; }
 #${MODAL_ID} button.primary:hover{ background:${THEME.primaryDark}; }
 
-/* --- Fixer "Hilfe & Infos"-Button unten rechts (fixed) ------------------- */
-#${HELP_BTN_ID}{
-  position:fixed; bottom:14px; right:14px; z-index:2147483647;
-  padding:8px 12px; border-radius:999px; background:${THEME.primary}; color:#fff;
-  font:600 13px/1 system-ui; border:1px solid ${THEME.primaryDark};
-  box-shadow:0 6px 16px rgba(0,0,0,.18); cursor:pointer; user-select:none;
-}
+#${HELP_BTN_ID}{ position:fixed; bottom:14px; right:14px; z-index:2147483647;
+  padding:8px 12px; border-radius:999px; background:${THEME.primary}; color:#fff; font:600 13px/1 system-ui;
+  border:1px solid ${THEME.primaryDark}; box-shadow:0 6px 16px rgba(0,0,0,.18); cursor:pointer; user-select:none; }
 #${HELP_BTN_ID}:hover{ background:${THEME.primaryDark}; }
-/* Vorsorglicher Header-Override ausschalten (immer fixed) */
 .usi-gradientbackground #${HELP_BTN_ID}{ position:fixed; bottom:14px; right:14px; }
 
-/* Popover: oberhalb des Buttons, rechtsbündig ausrichten */
-#${HELP_POPOVER_ID}{
-  position:fixed; bottom:56px; right:14px; z-index:2147483647;
-  min-width:260px; background:#fff; border:1px solid rgba(0,0,0,.08);
-  border-radius:${THEME.radiusSm}; box-shadow:${THEME.shadow}; padding:8px; display:none;
-}
+#${HELP_POPOVER_ID}{ position:fixed; bottom:56px; right:14px; z-index:2147483647; min-width:260px;
+  background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:10px; box-shadow:0 14px 40px rgba(0,0,0,.18); padding:8px; display:none; }
 #${HELP_POPOVER_ID}.open{ display:block; }
-#${HELP_POPOVER_ID} a{
-  display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px;
-  color:${THEME.text}; text-decoration:none;
-}
+#${HELP_POPOVER_ID} a{ display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; color:${THEME.text}; text-decoration:none; }
 #${HELP_POPOVER_ID} a:hover{ background:${THEME.surfaceAlt}; }
-#${HELP_POPOVER_ID} .accent{
-  display:inline-grid; place-items:center; width:22px; height:22px; border-radius:6px;
-  background:${THEME.primary}; color:#fff; font-weight:700;
-}
+#${HELP_POPOVER_ID} .accent{ display:inline-grid; place-items:center; width:22px; height:22px; border-radius:6px; background:${THEME.primary}; color:#fff; font-weight:700; }
 #${HELP_POPOVER_ID} .sep{ height:1px; background:rgba(0,0,0,.06); margin:6px 0; }
-
-@media (prefers-reduced-motion: reduce) {
-  #${MODAL_ID}-backdrop, #${MODAL_ID}, #${MODAL_ID} .dialog { transition:none !important; }
-}
 `;
 
   function todayKey(){
@@ -514,15 +461,10 @@
     }
   }
 
-  // ----------------------------- Modal -------------------------------------
   function buildModal(){
     if (document.getElementById(MODAL_ID)) return;
-
-    const backdrop = document.createElement("div");
-    backdrop.id = MODAL_ID + "-backdrop";
-
-    const modal = document.createElement("div");
-    modal.id = MODAL_ID; modal.setAttribute("role","dialog"); modal.setAttribute("aria-modal","true");
+    const backdrop = document.createElement("div"); backdrop.id = MODAL_ID + "-backdrop";
+    const modal = document.createElement("div"); modal.id = MODAL_ID; modal.setAttribute("role","dialog"); modal.setAttribute("aria-modal","true");
     modal.innerHTML = `
       <div class="dialog" role="document">
         <div class="accent"></div>
@@ -535,8 +477,7 @@
           <label class="left"><input type="checkbox" id="${MODAL_ID}-mute"> Heute nicht mehr zeigen</label>
           <button class="primary" id="${MODAL_ID}-close">Schließen</button>
         </div>
-      </div>
-    `;
+      </div>`;
     document.body.appendChild(backdrop);
     document.body.appendChild(modal);
 
@@ -546,8 +487,6 @@
       const mute = document.getElementById(`${MODAL_ID}-mute`);
       if (mute && mute.checked) markSeenToday();
     }
-
-    // Schließen: Button, ESC, Backdrop-Klick & Klick außerhalb
     modal.querySelector(`#${MODAL_ID}-close`).addEventListener("click", close);
     backdrop.addEventListener("click", close);
     modal.addEventListener("click", (e) => { if (!e.target.closest(".dialog")) close(); });
@@ -561,15 +500,11 @@
     setTimeout(()=> document.querySelector(`#${MODAL_ID} button.primary`)?.focus?.(), 40);
   }
 
-  // --------------------- fixer Hilfe-&-Infos-Button ------------------------
   function ensureHelpButton(){
     if (!document.getElementById(HELP_BTN_ID)) {
       const btn = document.createElement("button");
-      btn.id = HELP_BTN_ID;
-      btn.type = "button";
-      btn.textContent = "Hilfe & Infos";
+      btn.id = HELP_BTN_ID; btn.type = "button"; btn.textContent = "Hilfe & Infos";
       btn.addEventListener("click", toggleHelpPopover);
-      // fixed unten-rechts
       document.body.appendChild(btn);
     }
     if (!document.getElementById(HELP_POPOVER_ID)) {
@@ -585,13 +520,11 @@
         <div class="sep"></div>
         <a href="javascript:void(0)" id="${HELP_POPOVER_ID}-openmodal">
           <span class="accent">i</span><span>Hinweis erneut anzeigen</span>
-        </a>
-      `;
+        </a>`;
       document.body.appendChild(pop);
       pop.querySelector(`#${HELP_POPOVER_ID}-openmodal`).addEventListener("click", () => {
         closeHelpPopover(); openModal();
       });
-      // global schließen bei Außenklick
       document.addEventListener("click", (e)=>{
         const t = e.target;
         if (!t.closest(`#${HELP_POPOVER_ID}`) && !t.closest(`#${HELP_BTN_ID}`)) closeHelpPopover();
@@ -608,8 +541,6 @@
     const pop = document.getElementById(HELP_POPOVER_ID);
     if (pop) pop.classList.remove("open");
   }
-
-  // Positionierung: Popover oberhalb des (fixen) Buttons, rechtsbündig
   function syncPopoverPosition(){
     const btn = document.getElementById(HELP_BTN_ID);
     const pop = document.getElementById(HELP_POPOVER_ID);
@@ -617,67 +548,58 @@
     const r = btn.getBoundingClientRect();
     pop.style.top = "auto";
     pop.style.right = Math.max(14, window.innerWidth - r.right) + "px";
-    // Unterkante des Popovers 56px über der Viewport-Unterkante (sicher über Button)
     pop.style.bottom = Math.max(56, window.innerHeight - r.top + 8) + "px";
   }
 
-  // öffentlich: Modal manuell öffnen
   window.WU_ShowInfoModal = () => openModal();
 
-  // Init
   ensureStyle();
   ensureHelpButton();
-
-  // SPA/Redraw-Resilienz
-  new MutationObserver(() => ensureHelpButton())
-    .observe(document.documentElement, {childList:true, subtree:true});
-
+  new MutationObserver(() => ensureHelpButton()).observe(document.documentElement, {childList:true, subtree:true});
   window.addEventListener("resize", syncPopoverPosition);
   window.addEventListener("scroll", syncPopoverPosition, {passive:true});
 
-  // Auto-Öffnen (einmal pro Tag)
   if (!alreadySeenToday()) {
     const start = () => setTimeout(() => openModal(), CFG.delayMs);
     (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
   }
+})(); // IIFE 3
 
-     const CANDIDATES = [
-    'header a[href], .navbar a[href]',          // häufigstes Muster
+
+
+/* ============================================================================
+   WU – WU-Logo links als Home-Button (ohne feste URL, geht zu origin/)
+   ============================================================================ */
+(function () {
+  const CANDIDATES = [
+    'header a[href], .navbar a[href]',
     'header .logo a[href]',
-    'header img[alt*="WU"]',                    // falls das Logo nur ein <img> ist
-    '.usi-gradientbackground a[href]'           // Fallback
+    'header img[alt*="WU"]',
+    '.usi-gradientbackground a[href]'
   ];
 
   function attach(){
-    // Nimm das erste passende Element, das sichtbar ist und im Header liegt
     let node = null;
     for (const sel of CANDIDATES){
       const el = document.querySelector(sel);
       if (el && el.offsetParent !== null){ node = el; break; }
     }
     if (!node) return;
-
-    // Wenn es ein <img> ist, versuche den umgebenden Link zu nehmen
     const target = (node.tagName === 'IMG' ? node.closest('a') : node) || node;
-    if (!target || target.__wuHomeBound) return;  // nur einmal binden
+    if (!target || target.__wuHomeBound) return;
     target.__wuHomeBound = true;
 
-    // Optik & Verhalten
     target.style.cursor = 'pointer';
     target.addEventListener('click', (ev) => {
-      // immer zur „Root“ des aktuellen Origins, ohne Nutzer-spezifische Links zu kennen
       ev.preventDefault();
       const url = location.origin + '/';
-      // replace = kein zusätzlicher History-Eintrag
-      location.replace(url);
+      location.replace(url); // kein History-Eintrag
     });
   }
 
-  // Init + Robustheit bei SPA-Redraws
   (document.readyState === 'loading')
     ? document.addEventListener('DOMContentLoaded', attach)
     : attach();
 
   new MutationObserver(attach).observe(document.documentElement, {childList:true, subtree:true});
-})();
-
+})(); // IIFE 4
