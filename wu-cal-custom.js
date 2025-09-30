@@ -822,3 +822,66 @@
   window.WU_ImageViewer = { open: imgOpen, close: imgClose };
 })();
 
+/* ============================================================================
+   System-Lightbox abwürgen + bei Außenklick schließen
+   ============================================================================ */
+(function () {
+  // Bekannte Container / Close-Buttons / Backdrops (Angular/Bootstrap/MD/USI)
+  const CONTAINER_SEL = [
+    '.cdk-overlay-pane mat-dialog-container',
+    '.cdk-overlay-pane .mat-mdc-dialog-container',
+    '.mdc-dialog .mdc-dialog__container',
+    '.modal.show',
+    '.usi-op-imageViewerContainer, .usi-op-imageViewer'
+  ].join(',');
+  const CLOSE_BTN_SEL = [
+    '[aria-label*="schließ" i]','[aria-label*="close" i]',
+    '.mdc-icon-button','button.close','button[mat-dialog-close]'
+  ].join(',');
+  const BACKDROP_SEL = [
+    '.cdk-overlay-backdrop','._mat-animation-noopable.cdk-overlay-backdrop',
+    '.mdc-dialog__scrim','.modal-backdrop.show',
+    '.usi-op-imageViewerBackdrop, .usi-op-imageViewer-backdrop'
+  ].join(',');
+
+  function qSelAll(sel){ return Array.from(document.querySelectorAll(sel)); }
+  function anyVisible(els){ return els.find(el => !!(el.offsetParent || el.getClientRects().length)); }
+
+  function isSystemViewerOpen(){
+    return !!anyVisible(qSelAll(CONTAINER_SEL)) || !!anyVisible(qSelAll(BACKDROP_SEL));
+  }
+
+  function closeSystemViewer(){
+    // 1) Close Buttons
+    let did = false;
+    qSelAll(CONTAINER_SEL).forEach(c=>{
+      const btn = c.querySelector(CLOSE_BTN_SEL);
+      if (btn){ btn.click(); did = true; }
+    });
+    // 2) Backdrops anklicken
+    qSelAll(BACKDROP_SEL).forEach(b=>{ b.click(); did = true; });
+    // 3) Notnagel: ESC feuern (manche Dialoge hören darauf)
+    const esc = new KeyboardEvent('keydown', {key:'Escape', bubbles:true});
+    window.dispatchEvent(esc);
+    return did;
+  }
+
+  // Außenklick = Systemviewer schließen
+  document.addEventListener('click', (e)=>{
+    if (!isSystemViewerOpen()) return;
+    // Wenn außerhalb der Dialog-Box geklickt -> schließen
+    const inside = e.target.closest(CONTAINER_SEL);
+    if (!inside){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeSystemViewer();
+    }
+  }, true);
+
+  // Vor dem Öffnen unseres Viewers: vorhandene Systemviewer schließen
+  // -> Einfach globale Hook-Funktion bereitstellen, die du vor imgOpen() aufrufst
+  window.WU_CloseNativeViewers = closeSystemViewer;
+
+  // Optional: beim Seitenwechsel/Back sofort schließen
+  window.addEventListener('popstate', closeSystemViewer);
+})();
