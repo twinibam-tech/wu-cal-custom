@@ -1,29 +1,6 @@
-/* =============================================================================
-   WU – OSB Online Space Booking – Kundenseitiger "One-File"-Injector
-   ---------------------------------------------------------------------------
-   Wozu dieses Skript dient (Kurzfassung für künftige Self-Service-Anfragen):
-   - Läuft als einziges eingebettetes JS auf der WU/OSB-Kalenderseite.
-   - Injiziert CSS/UI-Tweaks (Logo im Header, angepasste Zeitachse, Mobile-Hinweise).
-   - Benennt einmalig den Spaltenkopf "SPACE" zu "Räume" um.
-   - Blendet in Angular-Material Tab-Leisten den Tab „Monat“ zuverlässig aus.
-     * Falls „Monat“ aktiv war, schaltet es automatisch auf „Woche“ (oder „Tag“) um.
-     * Funktioniert auch nach DOM-Redraws dank MutationObserver.
-   - Zeigt kurz einen Badge rechts oben (Version + „HIDE MONTH“) als Sichtbarkeitscheck.
-   - Fügt ein Popover hinzu: Klick auf graue/belegte Kästchen → „Nicht verfügbar“
-     mit sauber ermittelter Zeitspanne (inkl. rechtem Rand 21–22) und Raumbezug.
-   - Kunden-Info-Popup (Modal) inkl. fester „Hilfe & Infos“-Schaltfläche.
-   ============================================================================ */
-
-
-/* ============================================================================
-   WU – V8(2025-09-26)
-   - Neues Pop-Up Fenster
-   ============================================================================ */
-
-/* wu-cal-custom.js – CSS-Injection + sichtbarer Badge + "SPACE" -> "Räume" */
+/* wu-cal-custom.js – CSS-Injection + "SPACE" -> "Räume" (ohne Badge) */
 (function () {
   const STYLE_ID = "wu-inline-css";
-  const BADGE_ID = "wu-inline-badge";
 
   const CSS = `
 /* Header-Logo leicht nach innen & responsive */
@@ -136,31 +113,10 @@
     });
   }
 
-  function showBadge(){
-    const now = new Date().toLocaleTimeString();
-    const text = `  `;
-    let b = document.getElementById(BADGE_ID);
-    if (!b) {
-      b = document.createElement("div");
-      b.id = BADGE_ID;
-      Object.assign(b.style, {
-        position:"fixed", top:"12px", right:"12px", zIndex:999999,
-        padding:"8px 10px",
-        font:"14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial",
-        background:"#1b5e20", color:"#fff", borderRadius:"6px",
-        boxShadow:"0 2px 8px rgba(0,0,0,.15)"
-      });
-      document.documentElement.appendChild(b);
-    }
-    b.textContent = text;
-    setTimeout(() => b.remove(), 6000);
-  }
-
   function applyAll(){
     injectStyle();
     renameSpaceOnce();
     hideMonthTabAndSwitch();
-    showBadge();
   }
 
   if (document.readyState === "loading") {
@@ -173,8 +129,7 @@
     renameSpaceOnce();
     hideMonthTabAndSwitch();
   }).observe(document.documentElement, {subtree:true, childList:true});
-
-})(); // IIFE 1
+})(); 
 
 
 /* ============================================================================
@@ -667,4 +622,40 @@
     const start = () => setTimeout(() => openModal(), CFG.delayMs);
     (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
   }
-})();
+/* ============================================================================
+   WU – WU-Logo links als Home-Button (ohne feste URL, geht zu origin/)
+   ============================================================================ */
+(function () {
+  const CANDIDATES = [
+    'header a[href], .navbar a[href]',
+    'header .logo a[href]',
+    'header img[alt*="WU"]',
+    '.usi-gradientbackground a[href]'
+  ];
+
+  function attach(){
+    let node = null;
+    for (const sel of CANDIDATES){
+      const el = document.querySelector(sel);
+      if (el && el.offsetParent !== null){ node = el; break; }
+    }
+    if (!node) return;
+    const target = (node.tagName === 'IMG' ? node.closest('a') : node) || node;
+    if (!target || target.__wuHomeBound) return;
+    target.__wuHomeBound = true;
+
+    target.style.cursor = 'pointer';
+    target.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const url = location.origin + '/';
+      location.replace(url); // kein History-Eintrag
+    });
+  }
+
+  (document.readyState === 'loading')
+    ? document.addEventListener('DOMContentLoaded', attach)
+    : attach();
+
+  new MutationObserver(attach).observe(document.documentElement, {childList:true, subtree:true});
+})(); // IIFE 4
+
