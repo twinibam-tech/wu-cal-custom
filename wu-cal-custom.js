@@ -44,22 +44,6 @@
 .chadmo-gridsView .header-columns .header-column:nth-of-type(14) .mergedHeaderContent::before{content:"20:00";}
 .chadmo-gridsView .header-columns .header-column:nth-of-type(15) .mergedHeaderContent::before{content:"21:00";}
 
-/* Mobile: Hinweis + Häkchen */
-@media screen and (max-width:768px), (hover:none) and (pointer:coarse){
-  .usi-calendarHeader::before{
-    content:"✓ Verfügbar = Raum ist im angegebenen Zeitfenster frei.";
-    display:block; margin:12px 0 10px; padding:6px 10px; font-size:13px; font-weight:600; color:#1b5e20;
-    background:#e8f5e9; border:1px solid #b7e1c0; border-radius:6px;
-  }
-  app-calendar-mobile-view .usi-calendarDisplayMobile_description ~ .ng-star-inserted:not(.usi-calendarDisplayMobile_container):not(:empty),
-  app-calendar-mobile-view .usi-calendarDisplayMobile_container .ng-star-inserted:not(:empty){
-    display:flex; align-items:center; gap:6px;
-  }
-  app-calendar-mobile-view .usi-calendarDisplayMobile_description ~ .ng-star-inserted:not(.usi-calendarDisplayMobile_container):not(:empty)::before,
-  app-calendar-mobile-view .usi-calendarDisplayMobile_container .ng-star-inserted:not(:empty)::before{
-    content:"✓"; color:#2e7d32; font-weight:800; display:inline-block; min-width:1em;
-  }
-}
   `;
 
   function injectStyle(){
@@ -731,5 +715,94 @@
     : attach();
 
   new MutationObserver(attach).observe(document.documentElement, {childList:true, subtree:true});
+})();
+
+
+(function () {
+  const IMG_STYLE_ID = "wu-image-viewer-css";
+  const BACKDROP_ID  = "wu-imgv-backdrop";
+
+  const CSS = `
+#${BACKDROP_ID}{position:fixed;inset:0;background:rgba(0,0,0,.72);
+  display:none;align-items:center;justify-content:center;z-index:2147483640;}
+#${BACKDROP_ID}.open{display:flex;}
+#wu-imgv{position:relative;max-width:96vw;max-height:96vh;}
+#wu-imgv img{max-width:96vw;max-height:96vh;display:block;border-radius:10px;
+  box-shadow:0 12px 36px rgba(0,0,0,.45);}
+#wu-imgv .close{position:absolute;top:8px;right:8px;line-height:1;padding:8px 10px;
+  border-radius:8px;background:rgba(0,0,0,.55);color:#fff;border:none;font:600 13px system-ui;cursor:pointer}
+#wu-imgv .close:hover{background:rgba(0,0,0,.75)}
+`;
+
+  function ensureImgStyle(){
+    if(!document.getElementById(IMG_STYLE_ID)){
+      const s = document.createElement("style");
+      s.id = IMG_STYLE_ID;
+      s.textContent = CSS;
+      document.head.appendChild(s);
+    }
+  }
+
+  function ensureImgDom(){
+    if(document.getElementById(BACKDROP_ID)) return;
+    const b = document.createElement("div");
+    b.id = BACKDROP_ID;
+    b.innerHTML = `
+      <div id="wu-imgv" role="dialog" aria-modal="true">
+        <button class="close" aria-label="Schließen">×</button>
+        <img alt="">
+      </div>`;
+    document.body.appendChild(b);
+
+    // außerhalb klicken -> schließen
+    b.addEventListener("click", e => {
+      if(!e.target.closest("#wu-imgv img, #wu-imgv .close")) imgClose();
+    }, true);
+    b.querySelector(".close").addEventListener("click", imgClose);
+    window.addEventListener("keydown", e => { if (e.key === "Escape") imgClose(); });
+  }
+
+  function imgOpen(src, alt){
+    ensureImgStyle(); ensureImgDom();
+    const bd  = document.getElementById(BACKDROP_ID);
+    const img = bd.querySelector("img");
+    img.src = src;
+    img.alt = alt || "";
+    bd.classList.add("open");
+  }
+
+  function imgClose(){
+    const bd = document.getElementById(BACKDROP_ID);
+    if (!bd) return;
+    bd.classList.remove("open");
+    const img = bd.querySelector("img");
+    if (img) img.removeAttribute("src");
+  }
+
+  function looksLikeImageUrl(url){
+    return /\.(jpe?g|png|webp|gif|svg)(\?.*)?$/i.test(url || "");
+  }
+
+  // Delegation: Links auf Bilddateien + opt-in für nicht verlinkte Bilder
+  document.addEventListener("click", function(e){
+    const a   = e.target.closest('a[href]');
+    const img = e.target.closest('img');
+
+    // 1) Link zeigt direkt auf eine Bilddatei
+    if (a && looksLikeImageUrl(a.getAttribute('href'))){
+      e.preventDefault();
+      const href = new URL(a.getAttribute('href'), location.href).href;
+      imgOpen(href, a.getAttribute('aria-label') || a.title || "");
+      return;
+    }
+    // 2) Nicht verlinktes Bild (opt-in)
+    if (img && (img.dataset.viewer === "1" || img.classList.contains("wu-viewable"))){
+      e.preventDefault();
+      imgOpen(img.currentSrc || img.src, img.alt || "");
+    }
+  }, true);
+
+  // Optional global verfügbar machen
+  window.WU_ImageViewer = { open: imgOpen, close: imgClose };
 })();
 
