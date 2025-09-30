@@ -136,16 +136,6 @@
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", applyAll);
-  } else {
-    applyAll();
-  }
-
-  new MutationObserver(() => {
-    renameSpaceOnce();
-    hideMonthTabAndSwitch();
-  }).observe(document.documentElement, {subtree:true, childList:true});
 
 })(); // IIFE 1
 
