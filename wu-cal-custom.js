@@ -622,6 +622,7 @@
     const start = () => setTimeout(() => openModal(), CFG.delayMs);
     (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
   }
+  })();
 /* ============================================================================
    WU – WU-Logo links als Home-Button (ohne feste URL, geht zu origin/)
    ============================================================================ */
