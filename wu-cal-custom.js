@@ -717,6 +717,9 @@
   new MutationObserver(attach).observe(document.documentElement, {childList:true, subtree:true});
 })();
 
+/* ============================================================================
+   Bilder rausklicken
+   ============================================================================ */
 
 (function () {
   const IMG_STYLE_ID = "wu-image-viewer-css";
@@ -737,12 +740,9 @@
   function ensureImgStyle(){
     if(!document.getElementById(IMG_STYLE_ID)){
       const s = document.createElement("style");
-      s.id = IMG_STYLE_ID;
-      s.textContent = CSS;
-      document.head.appendChild(s);
+      s.id = IMG_STYLE_ID; s.textContent = CSS; document.head.appendChild(s);
     }
   }
-
   function ensureImgDom(){
     if(document.getElementById(BACKDROP_ID)) return;
     const b = document.createElement("div");
@@ -754,23 +754,24 @@
       </div>`;
     document.body.appendChild(b);
 
-    // außerhalb klicken -> schließen
+    // „Klick neben dem Bild“ => schließen (Capturing, damit es immer greift)
     b.addEventListener("click", e => {
-      if(!e.target.closest("#wu-imgv img, #wu-imgv .close")) imgClose();
+      if (!e.target.closest("#wu-imgv img, #wu-imgv .close")) imgClose();
     }, true);
+
     b.querySelector(".close").addEventListener("click", imgClose);
     window.addEventListener("keydown", e => { if (e.key === "Escape") imgClose(); });
+    window.addEventListener("scroll",  () => imgClose(), {passive:true});
+    window.addEventListener("popstate",() => imgClose());
   }
 
   function imgOpen(src, alt){
     ensureImgStyle(); ensureImgDom();
     const bd  = document.getElementById(BACKDROP_ID);
     const img = bd.querySelector("img");
-    img.src = src;
-    img.alt = alt || "";
+    img.src = src; img.alt = alt || "";
     bd.classList.add("open");
   }
-
   function imgClose(){
     const bd = document.getElementById(BACKDROP_ID);
     if (!bd) return;
@@ -779,30 +780,45 @@
     if (img) img.removeAttribute("src");
   }
 
+  // --- Bilderkennung robuster machen ---------------------------------------
   function looksLikeImageUrl(url){
-    return /\.(jpe?g|png|webp|gif|svg)(\?.*)?$/i.test(url || "");
+    if (!url) return false;
+    // klassische Endungen
+    if (/\.(jpe?g|png|webp|gif|svg)(\?.*)?$/i.test(url)) return true;
+    // typische CMS/Imageserver, Blob/Data-URLs
+    if (/image(server)?\/?getimage/i.test(url)) return true;
+    if (/^blob:|^data:image\//i.test(url)) return true;
+    return false;
   }
 
-  // Delegation: Links auf Bilddateien + opt-in für nicht verlinkte Bilder
-  document.addEventListener("click", function(e){
-    const a   = e.target.closest('a[href]');
-    const img = e.target.closest('img');
+  // --- Delegation: Links auf Bilddateien ODER direkt auf <img> --------------
+  // Opt-in/Opt-out: setze ALL_IMGS_CLICKABLE = true, wenn jedes <img> zoomen soll.
+  const ALL_IMGS_CLICKABLE = true;
 
-    // 1) Link zeigt direkt auf eine Bilddatei
-    if (a && looksLikeImageUrl(a.getAttribute('href'))){
-      e.preventDefault();
-      const href = new URL(a.getAttribute('href'), location.href).href;
-      imgOpen(href, a.getAttribute('aria-label') || a.title || "");
-      return;
+  document.addEventListener("click", function(e){
+    // 1) Link, der auf ein Bild zeigt (auch ohne Endung)
+    const a = e.target.closest('a[href]');
+    if (a) {
+      const href = a.getAttribute('href');
+      const hasImgChild = !!a.querySelector('img');
+      if (looksLikeImageUrl(href) && hasImgChild) {
+        e.preventDefault();
+        const abs = new URL(href, location.href).href;
+        imgOpen(abs, a.getAttribute('aria-label') || a.title || "");
+        return;
+      }
     }
-    // 2) Nicht verlinktes Bild (opt-in)
-    if (img && (img.dataset.viewer === "1" || img.classList.contains("wu-viewable"))){
+    // 2) Direkt auf ein <img> klicken
+    const img = e.target.closest('img');
+    if (img && !img.closest(`#${BACKDROP_ID}`)) {
+      if (img.dataset.noviewer === "1") return;                 // Opt-out
+      if (!ALL_IMGS_CLICKABLE && img.dataset.viewer !== "1") return; // alter Opt-in
       e.preventDefault();
       imgOpen(img.currentSrc || img.src, img.alt || "");
     }
   }, true);
 
-  // Optional global verfügbar machen
+  // global verfügbar (optional)
   window.WU_ImageViewer = { open: imgOpen, close: imgClose };
 })();
 
