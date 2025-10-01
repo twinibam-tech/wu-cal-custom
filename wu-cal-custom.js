@@ -719,10 +719,9 @@
 })();
 
 /* ============================================================================
-   WU – Viewer: robustes Outside-Click ohne Extra-X (v7.4)
+   WU – Viewer: robustes Outside-Click ohne Extra-X (v7.5)
    ============================================================================ */
 (function () {
-  // bekannte Overlays/Container & Medienflächen
   const BACKDROPS = [
     '.cdk-overlay-backdrop', '.mdc-dialog__scrim', '.modal-backdrop.show',
     '.usi-op-imageViewerBackdrop', '.usi-op-imageViewer-backdrop'
@@ -782,7 +781,6 @@
     return false;
   }
 
-  // größtes sichtbares Bild/Video im Container
   function largestMediaRect(root){
     if (!isEl(root)) return null;
     const medias = $$(SEL_SURFACE, root).filter(isVisible);
@@ -795,35 +793,11 @@
     }
     return best;
   }
+
   function pointInRect(x,y,r,margin=0){
     if (!r) return false;
     return x >= r.left - margin && x <= r.right + margin &&
            y >= r.top  - margin && y <= r.bottom + margin;
-  }
-
-  // schließt bei Klick auf Backdrop oder im Container außerhalb der Medienfläche
-  function onPointerDown(e){
-    if (!anyOpenOverlay()) return;
-
-    const tgt = e.target;
-    if (isEl(tgt) && tgt.matches?.(SEL_BACKDROP)) { // direkt auf Backdrop
-      safeClose();
-      return;
-    }
-
-    const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
-    const onSurface = path.some(n => isEl(n) && n.matches?.(SEL_SURFACE)); // Klick auf Bild/Video?
-    if (onSurface) return;
-
-    const insideOverlay = path.find(n => isEl(n) && (n.matches?.(SEL_CONTAINER) || n.matches?.(SEL_BACKDROP)));
-    if (!insideOverlay) return; // komplett außerhalb – ignorieren
-
-    const topContainer = findTopContainer();
-    const mediaRect = largestMediaRect(topContainer);
-    const x = e.clientX, y = e.clientY;
-
-    // außerhalb der Medienfläche? → schließen (Margin bei Bedarf erhöhen, z. B. 8)
-    if (!pointInRect(x, y, mediaRect, 10)) safeClose();
   }
 
   function safeClose(){
@@ -835,6 +809,43 @@
     const bs = isEl(root) ? root.closest?.('.modal.show') : null;
     const anyBs = bs || $('.modal.show');
     if (anyBs) anyBs.classList.remove('show');
+  }
+
+  // NEU: schließt auch, wenn außerhalb des Overlay-Containers geklickt wird
+  function onPointerDown(e){
+    if (!anyOpenOverlay()) return;
+
+    const tgt = e.target;
+
+    // 1) direkter Backdrop-Klick
+    if (isEl(tgt) && tgt.matches?.(SEL_BACKDROP)) {
+      safeClose();
+      return;
+    }
+
+    const topContainer = findTopContainer();
+    if (!topContainer) return;
+
+    const contRect  = topContainer.getBoundingClientRect();
+    const mediaRect = largestMediaRect(topContainer);
+    const x = e.clientX, y = e.clientY;
+
+    // 2) Klick liegt GESAMT außerhalb des Containers → schließen (dein roter Bereich)
+    if (!pointInRect(x, y, contRect, 0)) {
+      safeClose();
+      return;
+    }
+
+    // 3) Event-Pfad prüfen: Klick auf Medienfläche? → nicht schließen
+    const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+    const onSurface = path.some(n => isEl(n) && n.matches?.(SEL_SURFACE));
+    if (onSurface) return;
+
+    // 4) innerhalb des Containers, aber außerhalb der größten Medienfläche → schließen
+    //    Margin erhöhen, wenn „nah am Bildrand“ noch als „drin“ zählen soll (z. B. 8)
+    if (!pointInRect(x, y, mediaRect, 2)) {
+      safeClose();
+    }
   }
 
   // früh dran sein: pointerdown + Capture, damit Viewer-Libs nicht blocken
