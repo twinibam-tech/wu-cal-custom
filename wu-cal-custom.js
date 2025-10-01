@@ -719,12 +719,10 @@
 })();
 
 /* ============================================================================
-   WU – Viewer: robustes Outside-Click + universeller "X"-Close-Button (v7.3)
+   WU – Viewer: robustes Outside-Click ohne Extra-X (v7.4)
    ============================================================================ */
 (function () {
-  const STYLE_ID = "wu-viewer-close-style";
-  const BTN_ID   = "wu-viewer-close-btn";
-
+  // bekannte Overlays/Container & Medienflächen
   const BACKDROPS = [
     '.cdk-overlay-backdrop', '.mdc-dialog__scrim', '.modal-backdrop.show',
     '.usi-op-imageViewerBackdrop', '.usi-op-imageViewer-backdrop'
@@ -749,38 +747,6 @@
   const $    = (sel, root=document) => root.querySelector(sel);
   const $$   = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
-  function ensureStyle(){
-    if (document.getElementById(STYLE_ID)) return;
-    const s = document.createElement('style');
-    s.id = STYLE_ID;
-    s.textContent = `
-      #${BTN_ID}{
-        position:fixed; top:16px; right:16px; z-index:2147483647;
-        display:none; align-items:center; justify-content:center;
-        width:40px; height:40px; border-radius:999px;
-        background:rgba(0,0,0,.55); color:#fff; font:700 18px/1 system-ui;
-        border:1px solid rgba(255,255,255,.25); box-shadow:0 8px 22px rgba(0,0,0,.28);
-        cursor:pointer; user-select:none;
-      }
-      #${BTN_ID}.show{ display:flex; }
-      #${BTN_ID}:hover{ background:rgba(0,0,0,.72); }
-      #${BTN_ID}:focus{ outline:2px solid #0f6e85; outline-offset:2px; }
-    `;
-    document.head.appendChild(s);
-  }
-
-  function ensureButton(){
-    if (document.getElementById(BTN_ID)) return;
-    const b = document.createElement('button');
-    b.id = BTN_ID;
-    b.type = 'button';
-    b.setAttribute('aria-label','Schließen');
-    b.textContent = '✕';
-    b.addEventListener('click', closeTopViewer, {capture:true});
-    document.body.appendChild(b);
-  }
-
-  // Sichtbarkeitstest
   function isVisible(el){
     if (!isEl(el)) return false;
     const cs = getComputedStyle(el);
@@ -790,10 +756,10 @@
   }
 
   function anyOpenOverlay(){
-    const backs = $$(SEL_BACKDROP).filter(isVisible);
-    const conts = $$(SEL_CONTAINER).filter(isVisible);
-    const bsShow = $$('.modal.show').filter(isVisible);
-    return backs.length > 0 || conts.length > 0 || bsShow.length > 0;
+    const backs = $$(SEL_BACKDROP).some(isVisible);
+    const conts = $$(SEL_CONTAINER).some(isVisible);
+    const bs    = $$('.modal.show').some(isVisible);
+    return backs || conts || bs;
   }
 
   function findTopContainer(){
@@ -804,90 +770,88 @@
   function pressEsc(){
     window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
   }
-
   function clickFirstBackdrop(){
     const bd = $$(SEL_BACKDROP).find(isVisible);
     if (bd && typeof bd.click === 'function') bd.click();
   }
+  function tryNativeClose(root){
+    const btn = (
+      root && isEl(root) ? root : document
+    ).querySelector('[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button');
+    if (btn && typeof btn.click === 'function') { btn.click(); return true; }
+    return false;
+  }
 
-  function closeTopViewer(){
-    const root = findTopContainer() || document.body;
+  // Hilfsfunktion: größtes sichtbares Bild/Video im Container finden
+  function largestMediaRect(root){
+    if (!isEl(root)) return null;
+    const medias = $$(SEL_SURFACE, root).filter(isVisible);
+    if (!medias.length) return null;
+    let best = null, area = -1;
+    for (const m of medias){
+      const r = m.getBoundingClientRect();
+      const a = r.width * r.height;
+      if (a > area) { area = a; best = r; }
+    }
+    return best;
+  }
 
-    // 1) versuche native Close-Buttons
-    const closeBtn = $(
-      '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button',
-      root
-    ) || $(
-      '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button',
-      document
-    );
-    if (closeBtn && typeof closeBtn.click === 'function') {
-      closeBtn.click();
-      updateButton();
+  function pointInRect(x,y,r,margin=0){
+    if (!r) return false;
+    return x >= r.left - margin && x <= r.right + margin &&
+           y >= r.top  - margin && y <= r.bottom + margin;
+  }
+
+  // Haupt-Handler: schließt bei Klick auf Backdrop oder im Container außerhalb der Medienfläche
+  function onPointerDown(e){
+    if (!anyOpenOverlay()) return;
+
+    const tgt = e.target;
+    // 1) KLICK AUF BACKDROP → sofort schließen
+    if (isEl(tgt) && tgt.matches?.(SEL_BACKDROP)) {
+      safeClose();
       return;
     }
 
-    // 2) Backdrop-Klick
-    clickFirstBackdrop();
+    // 2) Kompletter Event-Pfad (auch durch ShadowDOM)
+    const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
 
-    // 3) ESC
-    pressEsc();
+    // 3) Wenn direkt auf Medienfläche geklickt → NICHT schließen
+    const onSurface = path.some(n => isEl(n) && n.matches?.(SEL_SURFACE));
+    if (onSurface) return;
 
+    // 4) Wurde irgendwo innerhalb eines Overlays geklickt?
+    const insideOverlay = path.find(n => isEl(n) && (n.matches?.(SEL_CONTAINER) || n.matches?.(SEL_BACKDROP)));
+    if (!insideOverlay) return; // völlig außerhalb – ignorieren
+
+    // 5) Wenn innerhalb des Containers, dann prüfen wir die Medien-Bounding-Box:
+    const topContainer = findTopContainer();
+    const mediaRect = largestMediaRect(topContainer);
+    const x = e.clientX, y = e.clientY;
+
+    // Ist der Klick außerhalb der Medienfläche (mit kleinem Rand)? → schließen
+    if (!pointInRect(x, y, mediaRect, 2)) {
+      safeClose();
+    }
+  }
+
+  function safeClose(){
+    const root = findTopContainer() || document.body;
+    if (tryNativeClose(root)) return; // 1) nativer Close
+    clickFirstBackdrop();             // 2) Backdrop-Klick
+    pressEsc();                       // 3) ESC
     // 4) Bootstrap-Fallback
     const bs = isEl(root) ? root.closest?.('.modal.show') : null;
     const anyBs = bs || $('.modal.show');
     if (anyBs) anyBs.classList.remove('show');
-
-    updateButton();
   }
 
-  // Outside-Click Handler
-  function onGlobalClick(e){
-    if (!anyOpenOverlay()) return;
+  // Events: pointerdown im Capture-Mode, damit es vor der Viewer-Lib feuert
+  document.addEventListener('pointerdown', onPointerDown, {capture:true});
 
-    const tgt = e.target;
-    if (isEl(tgt) && tgt.matches?.(SEL_BACKDROP)) {
-      closeTopViewer();
-      return;
-    }
+  // Für Tastatur-Nutzer: ESC irgendwo
+  window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') safeClose(); });
 
-    const path = (typeof e.composedPath === 'function') ? e.composedPath() : [];
-    const clickedOnSurface = path.some(n => isEl(n) && n.matches?.(SEL_SURFACE));
-    if (clickedOnSurface) return;
-
-    const clickedInsideOverlay = path.some(n => isEl(n) && (n.matches?.(SEL_CONTAINER) || n.matches?.(SEL_BACKDROP)));
-    if (clickedInsideOverlay) closeTopViewer();
-  }
-
-  function updateButton(){
-    const btn = document.getElementById(BTN_ID);
-    if (!btn) return;
-
-    if (anyOpenOverlay()) {
-      const root = findTopContainer() || document;
-      const nativeClose = (isEl(root) ? root : document).querySelector(
-        '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button'
-      );
-      btn.classList.toggle('show', !nativeClose);
-    } else {
-      btn.classList.remove('show');
-    }
-  }
-
-  // Init
-  ensureStyle();
-  ensureButton();
-
-  // Events
-  document.addEventListener('click', onGlobalClick, {capture:true});
-  window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') updateButton(); });
-
-  const mo = new MutationObserver(() => updateButton());
-  mo.observe(document.documentElement, {
-    childList:true, subtree:true,
-    attributes:true,
-    attributeFilter:['class','style','aria-hidden','aria-modal']
-  });
-
-  updateButton();
+  // SPA-Änderungen: nichts weiter nötig – wir arbeiten global.
 })();
+
