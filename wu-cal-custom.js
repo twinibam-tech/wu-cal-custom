@@ -830,7 +830,7 @@
     const x = e.clientX, y = e.clientY;
 
     // Ist der Klick außerhalb der Medienfläche (mit kleinem Rand)? → schließen
-    if (!pointInRect(x, y, mediaRect, 2)) {
+    if (!pointInRect(x, y, mediaRect, 8)) {
       safeClose();
     }
   }
