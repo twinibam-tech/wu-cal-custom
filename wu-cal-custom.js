@@ -782,7 +782,7 @@
     return false;
   }
 
-  // Hilfsfunktion: größtes sichtbares Bild/Video im Container finden
+  // größtes sichtbares Bild/Video im Container
   function largestMediaRect(root){
     if (!isEl(root)) return null;
     const medias = $$(SEL_SURFACE, root).filter(isVisible);
@@ -795,44 +795,35 @@
     }
     return best;
   }
-
   function pointInRect(x,y,r,margin=0){
     if (!r) return false;
     return x >= r.left - margin && x <= r.right + margin &&
            y >= r.top  - margin && y <= r.bottom + margin;
   }
 
-  // Haupt-Handler: schließt bei Klick auf Backdrop oder im Container außerhalb der Medienfläche
+  // schließt bei Klick auf Backdrop oder im Container außerhalb der Medienfläche
   function onPointerDown(e){
     if (!anyOpenOverlay()) return;
 
     const tgt = e.target;
-    // 1) KLICK AUF BACKDROP → sofort schließen
-    if (isEl(tgt) && tgt.matches?.(SEL_BACKDROP)) {
+    if (isEl(tgt) && tgt.matches?.(SEL_BACKDROP)) { // direkt auf Backdrop
       safeClose();
       return;
     }
 
-    // 2) Kompletter Event-Pfad (auch durch ShadowDOM)
     const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
-
-    // 3) Wenn direkt auf Medienfläche geklickt → NICHT schließen
-    const onSurface = path.some(n => isEl(n) && n.matches?.(SEL_SURFACE));
+    const onSurface = path.some(n => isEl(n) && n.matches?.(SEL_SURFACE)); // Klick auf Bild/Video?
     if (onSurface) return;
 
-    // 4) Wurde irgendwo innerhalb eines Overlays geklickt?
     const insideOverlay = path.find(n => isEl(n) && (n.matches?.(SEL_CONTAINER) || n.matches?.(SEL_BACKDROP)));
-    if (!insideOverlay) return; // völlig außerhalb – ignorieren
+    if (!insideOverlay) return; // komplett außerhalb – ignorieren
 
-    // 5) Wenn innerhalb des Containers, dann prüfen wir die Medien-Bounding-Box:
     const topContainer = findTopContainer();
     const mediaRect = largestMediaRect(topContainer);
     const x = e.clientX, y = e.clientY;
 
-    // Ist der Klick außerhalb der Medienfläche (mit kleinem Rand)? → schließen
-    if (!pointInRect(x, y, mediaRect, 8)) {
-      safeClose();
-    }
+    // außerhalb der Medienfläche? → schließen (Margin bei Bedarf erhöhen, z. B. 8)
+    if (!pointInRect(x, y, mediaRect, 10)) safeClose();
   }
 
   function safeClose(){
@@ -846,12 +837,7 @@
     if (anyBs) anyBs.classList.remove('show');
   }
 
-  // Events: pointerdown im Capture-Mode, damit es vor der Viewer-Lib feuert
+  // früh dran sein: pointerdown + Capture, damit Viewer-Libs nicht blocken
   document.addEventListener('pointerdown', onPointerDown, {capture:true});
-
-  // Für Tastatur-Nutzer: ESC irgendwo
   window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') safeClose(); });
-
-  // SPA-Änderungen: nichts weiter nötig – wir arbeiten global.
 })();
-
