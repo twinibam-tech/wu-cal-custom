@@ -719,7 +719,7 @@
 })();
 
 /* ============================================================================
-   WU – Viewer: robustes Outside-Click + universeller "X"-Close-Button (v7.2)
+   WU – Viewer: robustes Outside-Click + universeller "X"-Close-Button (v7.3)
    ============================================================================ */
 (function () {
   const STYLE_ID = "wu-viewer-close-style";
@@ -780,12 +780,24 @@
     document.body.appendChild(b);
   }
 
+  // Sichtbarkeitstest
+  function isVisible(el){
+    if (!isEl(el)) return false;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+
   function anyOpenOverlay(){
-    return !!($(SEL_BACKDROP) || $(SEL_CONTAINER));
+    const backs = $$(SEL_BACKDROP).filter(isVisible);
+    const conts = $$(SEL_CONTAINER).filter(isVisible);
+    const bsShow = $$('.modal.show').filter(isVisible);
+    return backs.length > 0 || conts.length > 0 || bsShow.length > 0;
   }
 
   function findTopContainer(){
-    const all = $$(SEL_CONTAINER);
+    const all = $$(SEL_CONTAINER).filter(isVisible);
     return all.length ? all[all.length - 1] : null;
   }
 
@@ -794,7 +806,7 @@
   }
 
   function clickFirstBackdrop(){
-    const bd = $(SEL_BACKDROP);
+    const bd = $$(SEL_BACKDROP).find(isVisible);
     if (bd && typeof bd.click === 'function') bd.click();
   }
 
@@ -815,13 +827,13 @@
       return;
     }
 
-    // 2) Backdrop-Klick als Fallback
+    // 2) Backdrop-Klick
     clickFirstBackdrop();
 
-    // 3) ESC als zusätzlicher Fallback
+    // 3) ESC
     pressEsc();
 
-    // 4) Bootstrap-Modal zur Not "ent-showen"
+    // 4) Bootstrap-Fallback
     const bs = isEl(root) ? root.closest?.('.modal.show') : null;
     const anyBs = bs || $('.modal.show');
     if (anyBs) anyBs.classList.remove('show');
@@ -829,23 +841,20 @@
     updateButton();
   }
 
-  // Outside-Click (Capture) + Backdrop-Klick
+  // Outside-Click Handler
   function onGlobalClick(e){
     if (!anyOpenOverlay()) return;
 
-    // Backdrop? -> sofort schließen
     const tgt = e.target;
-    if (isEl(tgt) && (tgt.matches?.(SEL_BACKDROP))) {
+    if (isEl(tgt) && tgt.matches?.(SEL_BACKDROP)) {
       closeTopViewer();
       return;
     }
 
     const path = (typeof e.composedPath === 'function') ? e.composedPath() : [];
-    // Nicht schließen, wenn direkt auf Medienflächen geklickt wurde
     const clickedOnSurface = path.some(n => isEl(n) && n.matches?.(SEL_SURFACE));
     if (clickedOnSurface) return;
 
-    // Schließen, wenn irgendwo innerhalb eines Overlays/BG geklickt wurde
     const clickedInsideOverlay = path.some(n => isEl(n) && (n.matches?.(SEL_CONTAINER) || n.matches?.(SEL_BACKDROP)));
     if (clickedInsideOverlay) closeTopViewer();
   }
@@ -856,9 +865,8 @@
 
     if (anyOpenOverlay()) {
       const root = findTopContainer() || document;
-      const nativeClose = $(
-        '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button',
-        isEl(root) ? root : document
+      const nativeClose = (isEl(root) ? root : document).querySelector(
+        '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button'
       );
       btn.classList.toggle('show', !nativeClose);
     } else {
@@ -874,15 +882,12 @@
   document.addEventListener('click', onGlobalClick, {capture:true});
   window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') updateButton(); });
 
-  // MutationObserver: auch Attribut-Änderungen (Bootstrap .show / inline styles)
   const mo = new MutationObserver(() => updateButton());
   mo.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class','style','aria-hidden','aria-modal']
+    childList:true, subtree:true,
+    attributes:true,
+    attributeFilter:['class','style','aria-hidden','aria-modal']
   });
 
-  // einmalig setzen
   updateButton();
 })();
