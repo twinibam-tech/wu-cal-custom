@@ -717,78 +717,134 @@
   new MutationObserver(attach).observe(document.documentElement, {childList:true, subtree:true});
 })();
 
+>
 /* ============================================================================
-   System-Foto/Lightbox sicher schließen bei Außenklick – ohne globale Hooks
+   WU – Viewer: robustes Outside-Click + universeller "X"-Close-Button (v7.1)
    ============================================================================ */
 (function () {
-  // Backdrops/Container der eingebauten Viewer (Material/Bootstrap/USI)
+  const STYLE_ID = "wu-viewer-close-style";
+  const BTN_ID   = "wu-viewer-close-btn";
+
+  // bekannte Overlays/Container & "Medienflächen", auf die NICHT geschlossen wird
   const BACKDROPS = [
-    '.cdk-overlay-backdrop',           // Angular Material
-    '.mdc-dialog__scrim',              // MDC
-    '.modal-backdrop.show',            // Bootstrap
-    '.usi-op-imageViewerBackdrop',     // USI/Ungerboeck (dunkler Bereich)
-    '.usi-op-imageViewer-backdrop'
+    '.cdk-overlay-backdrop', '.mdc-dialog__scrim', '.modal-backdrop.show',
+    '.usi-op-imageViewerBackdrop', '.usi-op-imageViewer-backdrop'
   ];
   const CONTAINERS = [
     '.cdk-overlay-pane .mat-mdc-dialog-container',
     '.mdc-dialog .mdc-dialog__container',
     '.modal.show',
-    '.usi-op-imageViewerContainer',    // Bildcontainer
-    '.usi-op-imageViewer'
+    '.usi-op-imageViewerContainer', '.usi-op-imageViewer'
   ];
-  const CLOSE_BTNS = [
-    '[aria-label*="schließ" i]',
-    '[aria-label*="close" i]',
-    'button[mat-dialog-close]',
-    'button.close',
-    '.mdc-icon-button'
+  const SURFACES = [
+    'img', 'video', 'picture',
+    '.mdc-dialog__surface', '.mat-mdc-dialog-surface',
+    '.usi-op-imageViewer img', '.usi-op-imageViewer video'
   ];
 
   const SEL_BACKDROP  = BACKDROPS.join(',');
   const SEL_CONTAINER = CONTAINERS.join(',');
-  const SEL_CLOSEBTN  = CLOSE_BTNS.join(',');
+  const SEL_SURFACE   = SURFACES.join(',');
 
-  function closeViewer(root){
-    let did = false;
-    // 1) Falls es einen Close-Button gibt → klicken
-    (root.querySelector(SEL_CLOSEBTN) || document.querySelector(SEL_CLOSEBTN))?.click?.() && (did = true);
+  function ensureStyle(){
+    if (document.getElementById(STYLE_ID)) return;
+    const s = document.createElement('style');
+    s.id = STYLE_ID;
+    s.textContent = `
+      #${BTN_ID}{
+        position:fixed; top:16px; right:16px; z-index:2147483647;
+        display:none; align-items:center; justify-content:center;
+        width:40px; height:40px; border-radius:999px;
+        background:rgba(0,0,0,.55); color:#fff; font:700 18px/1 system-ui;
+        border:1px solid rgba(255,255,255,.25); box-shadow:0 8px 22px rgba(0,0,0,.28);
+        cursor:pointer; user-select:none;
+      }
+      #${BTN_ID}.show{ display:flex; }
+      #${BTN_ID}:hover{ background:rgba(0,0,0,.72); }
+      #${BTN_ID}:focus{ outline:2px solid #0f6e85; outline-offset:2px; }
+    `;
+    document.head.appendChild(s);
+  }
+
+  function ensureButton(){
+    if (document.getElementById(BTN_ID)) return;
+    const b = document.createElement('button');
+    b.id = BTN_ID;
+    b.type = 'button';
+    b.setAttribute('aria-label','Schließen');
+    b.textContent = '✕';
+    b.addEventListener('click', closeTopViewer, {capture:true});
+    document.body.appendChild(b);
+  }
+
+  function anyOpenOverlay(){
+    return !!(document.querySelector(SEL_BACKDROP) || document.querySelector(SEL_CONTAINER));
+  }
+
+  function findTopContainer(){
+    // nimm den zuletzt im DOM stehenden (vermeintlich obersten) Container
+    const all = Array.from(document.querySelectorAll(SEL_CONTAINER));
+    return all.length ? all[all.length - 1] : null;
+  }
+
+  function closeTopViewer(){
+    const root = findTopContainer() || document.body;
+    // 1) versuche einen Close-Button im Overlay
+    const closeBtn = root.querySelector(
+      '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button'
+    );
+    if (closeBtn && typeof closeBtn.click === 'function') { closeBtn.click(); return; }
     // 2) ESC als Fallback
     window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
-    return did;
+    // 3) Bootstrap Modals: class entfernen (harmlos falls nicht vorhanden)
+    const bs = root.closest('.modal.show') || document.querySelector('.modal.show');
+    if (bs) bs.classList.remove('show');
+    updateButton(); // Button verstecken, falls nötig
   }
 
-  // Klick genau auf die Backdrop-Elemente schließt – sonst nichts anfassen
-  function bindBackdrop(el){
-    if (!el || el.__wuBound) return;
-    el.__wuBound = true;
-    el.addEventListener('click', () => closeViewer(el), {passive:true});
-  }
+  // Robust: Outside-Click via composedPath in Capture-Phase
+  function onGlobalClick(e){
+    if (!anyOpenOverlay()) return;
+    const path = (e.composedPath && e.composedPath()) || [];
+    // Klicke NICHT schließen, wenn auf einer Medienfläche geklickt wurde
+    const clickedOnSurface = path.some(n => n instanceof Element && n.matches && n.matches(SEL_SURFACE));
+    if (clickedOnSurface) return;
 
-  // Falls es keinen Backdrop gibt (manche Viewer), klick außerhalb des Bildes im Container
-  function bindContainer(el){
-    if (!el || el.__wuBound) return;
-    el.__wuBound = true;
-    el.addEventListener('click', (e) => {
-      const clickedInsideMedia = e.target.closest('img, video, picture, .mdc-dialog__surface, .mat-mdc-dialog-surface');
-      if (!clickedInsideMedia) closeViewer(el);
-    }, {capture:true});
-  }
-
-  // Initial binden (falls schon offen)
-  document.querySelectorAll(SEL_BACKDROP).forEach(bindBackdrop);
-  document.querySelectorAll(SEL_CONTAINER).forEach(bindContainer);
-
-  // Später auftauchende Overlays beobachten
-  new MutationObserver((muts)=>{
-    for (const m of muts) {
-      m.addedNodes.forEach(n => {
-        if (!(n instanceof HTMLElement)) return;
-        if (n.matches?.(SEL_BACKDROP))  bindBackdrop(n);
-        if (n.matches?.(SEL_CONTAINER)) bindContainer(n);
-        // auch in Tiefe suchen
-        n.querySelectorAll?.(SEL_BACKDROP).forEach(bindBackdrop);
-        n.querySelectorAll?.(SEL_CONTAINER).forEach(bindContainer);
-      });
+    // Nur schließen, wenn Klick "innerhalb" eines Overlays stattfindet – sonst ignorieren
+    const clickedInsideOverlay = path.some(n => n instanceof Element && (n.matches?.(SEL_CONTAINER) || n.matches?.(SEL_BACKDROP)));
+    if (clickedInsideOverlay) {
+      closeTopViewer();
     }
-  }).observe(document.documentElement, {childList:true, subtree:true});
+  }
+
+  function updateButton(){
+    const btn = document.getElementById(BTN_ID);
+    if (!btn) return;
+    // Nur zeigen, wenn Overlay offen ist UND kein sichtbarer nativer Close-Button existiert
+    if (anyOpenOverlay()) {
+      const root = findTopContainer() || document;
+      const nativeClose = root.querySelector(
+        '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button'
+      );
+      btn.classList.toggle('show', !nativeClose);
+    } else {
+      btn.classList.remove('show');
+    }
+  }
+
+  // Init
+  ensureStyle();
+  ensureButton();
+
+  // Events
+  document.addEventListener('click', onGlobalClick, {capture:true});
+  window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') updateButton(); });
+
+  // Beobachten, ob Overlays kommen/gehen → Button-Sichtbarkeit synchronisieren
+  const mo = new MutationObserver(() => updateButton());
+  mo.observe(document.documentElement, {childList:true, subtree:true});
+
+  // einmalig setzen
+  updateButton();
 })();
+
