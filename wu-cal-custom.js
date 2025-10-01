@@ -1,3 +1,4 @@
+
 /* wu-cal-custom.js – CSS-Injection + "SPACE" -> "Räume" (ohne Badge) */
 (function () {
   const STYLE_ID = "wu-inline-css";
@@ -717,15 +718,13 @@
   new MutationObserver(attach).observe(document.documentElement, {childList:true, subtree:true});
 })();
 
->
 /* ============================================================================
-   WU – Viewer: robustes Outside-Click + universeller "X"-Close-Button (v7.1)
+   WU – Viewer: robustes Outside-Click + universeller "X"-Close-Button (v7.2)
    ============================================================================ */
 (function () {
   const STYLE_ID = "wu-viewer-close-style";
   const BTN_ID   = "wu-viewer-close-btn";
 
-  // bekannte Overlays/Container & "Medienflächen", auf die NICHT geschlossen wird
   const BACKDROPS = [
     '.cdk-overlay-backdrop', '.mdc-dialog__scrim', '.modal-backdrop.show',
     '.usi-op-imageViewerBackdrop', '.usi-op-imageViewer-backdrop'
@@ -745,6 +744,10 @@
   const SEL_BACKDROP  = BACKDROPS.join(',');
   const SEL_CONTAINER = CONTAINERS.join(',');
   const SEL_SURFACE   = SURFACES.join(',');
+
+  const isEl = (n) => n instanceof Element;
+  const $    = (sel, root=document) => root.querySelector(sel);
+  const $$   = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
   function ensureStyle(){
     if (document.getElementById(STYLE_ID)) return;
@@ -778,53 +781,84 @@
   }
 
   function anyOpenOverlay(){
-    return !!(document.querySelector(SEL_BACKDROP) || document.querySelector(SEL_CONTAINER));
+    return !!($(SEL_BACKDROP) || $(SEL_CONTAINER));
   }
 
   function findTopContainer(){
-    // nimm den zuletzt im DOM stehenden (vermeintlich obersten) Container
-    const all = Array.from(document.querySelectorAll(SEL_CONTAINER));
+    const all = $$(SEL_CONTAINER);
     return all.length ? all[all.length - 1] : null;
+  }
+
+  function pressEsc(){
+    window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
+  }
+
+  function clickFirstBackdrop(){
+    const bd = $(SEL_BACKDROP);
+    if (bd && typeof bd.click === 'function') bd.click();
   }
 
   function closeTopViewer(){
     const root = findTopContainer() || document.body;
-    // 1) versuche einen Close-Button im Overlay
-    const closeBtn = root.querySelector(
-      '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button'
+
+    // 1) versuche native Close-Buttons
+    const closeBtn = $(
+      '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button',
+      root
+    ) || $(
+      '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button',
+      document
     );
-    if (closeBtn && typeof closeBtn.click === 'function') { closeBtn.click(); return; }
-    // 2) ESC als Fallback
-    window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
-    // 3) Bootstrap Modals: class entfernen (harmlos falls nicht vorhanden)
-    const bs = root.closest('.modal.show') || document.querySelector('.modal.show');
-    if (bs) bs.classList.remove('show');
-    updateButton(); // Button verstecken, falls nötig
+    if (closeBtn && typeof closeBtn.click === 'function') {
+      closeBtn.click();
+      updateButton();
+      return;
+    }
+
+    // 2) Backdrop-Klick als Fallback
+    clickFirstBackdrop();
+
+    // 3) ESC als zusätzlicher Fallback
+    pressEsc();
+
+    // 4) Bootstrap-Modal zur Not "ent-showen"
+    const bs = isEl(root) ? root.closest?.('.modal.show') : null;
+    const anyBs = bs || $('.modal.show');
+    if (anyBs) anyBs.classList.remove('show');
+
+    updateButton();
   }
 
-  // Robust: Outside-Click via composedPath in Capture-Phase
+  // Outside-Click (Capture) + Backdrop-Klick
   function onGlobalClick(e){
     if (!anyOpenOverlay()) return;
-    const path = (e.composedPath && e.composedPath()) || [];
-    // Klicke NICHT schließen, wenn auf einer Medienfläche geklickt wurde
-    const clickedOnSurface = path.some(n => n instanceof Element && n.matches && n.matches(SEL_SURFACE));
+
+    // Backdrop? -> sofort schließen
+    const tgt = e.target;
+    if (isEl(tgt) && (tgt.matches?.(SEL_BACKDROP))) {
+      closeTopViewer();
+      return;
+    }
+
+    const path = (typeof e.composedPath === 'function') ? e.composedPath() : [];
+    // Nicht schließen, wenn direkt auf Medienflächen geklickt wurde
+    const clickedOnSurface = path.some(n => isEl(n) && n.matches?.(SEL_SURFACE));
     if (clickedOnSurface) return;
 
-    // Nur schließen, wenn Klick "innerhalb" eines Overlays stattfindet – sonst ignorieren
-    const clickedInsideOverlay = path.some(n => n instanceof Element && (n.matches?.(SEL_CONTAINER) || n.matches?.(SEL_BACKDROP)));
-    if (clickedInsideOverlay) {
-      closeTopViewer();
-    }
+    // Schließen, wenn irgendwo innerhalb eines Overlays/BG geklickt wurde
+    const clickedInsideOverlay = path.some(n => isEl(n) && (n.matches?.(SEL_CONTAINER) || n.matches?.(SEL_BACKDROP)));
+    if (clickedInsideOverlay) closeTopViewer();
   }
 
   function updateButton(){
     const btn = document.getElementById(BTN_ID);
     if (!btn) return;
-    // Nur zeigen, wenn Overlay offen ist UND kein sichtbarer nativer Close-Button existiert
+
     if (anyOpenOverlay()) {
       const root = findTopContainer() || document;
-      const nativeClose = root.querySelector(
-        '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button'
+      const nativeClose = $(
+        '[aria-label*="schließ" i], [aria-label*="close" i], button[mat-dialog-close], button.close, .mdc-icon-button',
+        isEl(root) ? root : document
       );
       btn.classList.toggle('show', !nativeClose);
     } else {
@@ -840,11 +874,15 @@
   document.addEventListener('click', onGlobalClick, {capture:true});
   window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') updateButton(); });
 
-  // Beobachten, ob Overlays kommen/gehen → Button-Sichtbarkeit synchronisieren
+  // MutationObserver: auch Attribut-Änderungen (Bootstrap .show / inline styles)
   const mo = new MutationObserver(() => updateButton());
-  mo.observe(document.documentElement, {childList:true, subtree:true});
+  mo.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class','style','aria-hidden','aria-modal']
+  });
 
   // einmalig setzen
   updateButton();
 })();
-
