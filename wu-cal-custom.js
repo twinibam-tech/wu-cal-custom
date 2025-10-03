@@ -307,12 +307,16 @@
         <div class="wu-callout-icon" aria-hidden="true">ℹ️</div>
         <div class="wu-callout-content">
           <div class="wu-callout-title">Aktuelle Hinweise</div>
-          <p><strong>Die eingesetzte Software ist stark limitiert und lässt sich kaum anpassen.</strong> Folgende Probleme sind uns bekannt und können wie folgt gelöst werden:</p>
-          <p>1) Der Raumkalender ist verzerrt, unscharf oder zeigt nichts an -> Seite neu laden (F5 klicken) </p>
-          <p>2) Der Raumkalender zeigt die Raumnamen nicht korrekt an -> Raumspalte mit der Maus auseinander ziehen (erste Spalte neben Räume und Uhrzeit) </p>
-          <p>3) Nachdem ich mich auslogge, kann ich mich nicht mehr über die WU SSO anmelden -> Seite komplett neu laden um automatisch wieder angemeldet zu werden (F5 klicken) </p>
-          <p>4) Wenn ich ein Foto anklicke, kann ich es nicht mehr schließen -> Escape-Taste verwenden </p>
-          <p><strong>Für vollständige und aktuele Informationen, nutzen Sie bitte folgende Tools:</strong></p>
+            <p><strong>Hinweis:</strong> Die eingesetzte Software weist einige Einschränkungen auf. Die folgenden bekannten Probleme lassen sich so beheben:</p>
+    
+            <ol>
+              <li><strong>Raumkalender ist verzerrt, unscharf oder leer:</strong> Seite neu laden (Taste <kbd>F5</kbd>).</li>
+              <li><strong>Raumnamen im Raumkalender werden nicht korrekt angezeigt:</strong> Spaltenbreite der ersten Spalte (neben „Räume“/„Uhrzeit“) mit der Maus vergrößern.</li>
+              <li><strong>Nach dem Ausloggen ist die WU-SSO-Anmeldung nicht möglich:</strong> Seite vollständig neu laden (Taste <kbd>F5</kbd>); die Anmeldung startet automatisch.</li>
+              <li><strong>Ein Bild lässt sich nach dem Anklicken nicht schließen:</strong> <kbd>Esc</kbd>-Taste drücken.</li>
+            </ol>
+            
+            <p><strong>Für vollständige und aktuelle Informationen nutzen Sie bitte folgende Tools:</strong></p>
         </div>
       </div>
 
