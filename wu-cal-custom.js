@@ -305,17 +305,7 @@
     html: `
       <div class="wu-callout">
         <div class="wu-callout-icon" aria-hidden="true">ℹ️</div>
-        <div class="wu-callout-content">
-          <div class="wu-callout-title">Aktuelle Hinweise</div>
-            <p><strong>Hinweis:</strong> Die eingesetzte Software weist einige Einschränkungen auf. Die folgenden bekannten Probleme lassen sich so beheben:</p>
-    
-            <ol>
-              <li><strong>Raumkalender ist verzerrt, unscharf oder leer:</strong> Seite neu laden (Taste <kbd>F5</kbd>).</li>
-              <li><strong>Raumnamen im Raumkalender werden nicht korrekt angezeigt:</strong> Spaltenbreite der ersten Spalte (neben „Räume“/„Uhrzeit“) mit der Maus vergrößern.</li>
-              <li><strong>Nach dem Ausloggen ist die WU-SSO-Anmeldung nicht möglich:</strong> Seite vollständig neu laden (Taste <kbd>F5</kbd>); die Anmeldung startet automatisch.</li>
-              <li><strong>Ein Bild lässt sich nach dem Anklicken nicht schließen:</strong> <kbd>Esc</kbd>-Taste drücken.</li>
-            </ol>
-            
+        <div class="wu-callout-content">           
             <p><strong>Für vollständige und aktuelle Informationen nutzen Sie bitte folgende Tools:</strong></p>
         </div>
       </div>
@@ -324,7 +314,7 @@
         <a class="wu-btn wu-btn-primary" href="https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1" target="_blank" rel="noopener" aria-label="Rauminfo-Tool öffnen">
           <span class="wu-btn-icon">⌂</span><span class="wu-btn-label">Rauminfo-Tool öffnen</span>
         </a>
-        <a class="wu-btn" href="https://swa.wu.ac.at/Serviceeinrichtungen/evd/Documents/VM/Step-by-Step_Stand%2006.11.2024.pdf" target="_blank" rel="noopener" aria-label="Handbuch als PDF öffnen">
+        <a class="wu-btn" href="https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1" target="_blank" rel="noopener" aria-label="Leitfaden bald Verfügbar">
           <span class="wu-btn-icon">📄</span><span class="wu-btn-label">Handbuch (PDF)</span>
         </a>
       </div>
