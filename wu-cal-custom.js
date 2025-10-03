@@ -306,9 +306,13 @@
       <div class="wu-callout">
         <div class="wu-callout-icon" aria-hidden="true">ℹ️</div>
         <div class="wu-callout-content">
-          <div class="wu-callout-title">Aktueller Hinweis</div>
-          <p><strong>Zurzeit limitiert die eingesetzte Software die Anzeige der Raumdetails.</strong> Bis zum nächsten Update können im Online-Kalender nicht alle Details dargestellt werden.</p>
-          <p><strong>Bitte nutzen Sie für vollständige, verlässliche Informationen:</strong></p>
+          <div class="wu-callout-title">Aktuelle Hinweise</div>
+          <p><strong>Die eingesetzte Software ist stark limitiert und lässt sich kaum anpassen.</strong> Folgende Probleme sind uns bekannt und können wie folgt gelöst werden:</p>
+          <p>1) Der Raumkalender ist verzerrt, unscharf oder zeigt nichts an -> Seite neu laden (F5 klicken) </p>
+          <p>2) Der Raumkalender zeigt die Raumnamen nicht korrekt an -> Raumspalte mit der Maus auseinander ziehen (erste Spalte neben Räume und Uhrzeit) </p>
+          <p>3) Nachdem ich mich auslogge, kann ich mich nicht mehr über die WU SSO anmelden -> Seite komplett neu laden um automatisch wieder angemeldet zu werden (F5 klicken) </p>
+          <p>4) Wenn ich ein Foto anklicke, kann ich es nicht mehr schließen -> Escape-Taste verwenden </p>
+          <p><strong>Für vollständige und aktuele Informationen, nutzen Sie bitte folgende Tools:</strong></p>
         </div>
       </div>
 
