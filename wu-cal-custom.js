@@ -319,7 +319,7 @@
         </a>
       </div>
 
-      <p class="wu-contact">Fragen? Wir helfen gerne weiter: <a href="mailto:service@wu.ac.at">service@wu.ac.at</a></p>
+      <p class="wu-contact">Fragen? Wir helfen gerne weiter: <a href="mailto:service@wu.ac.at">events@wu.ac.at</a></p>
     `,
     delayMs: 900,
     showOncePerDay: true,
