@@ -315,7 +315,7 @@
           <span class="wu-btn-icon">⌂</span><span class="wu-btn-label">Rauminfo-Tool öffnen</span>
         </a>
         <a class="wu-btn" href="https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1" target="_blank" rel="noopener" aria-label="Leitfaden bald Verfügbar">
-          <span class="wu-btn-icon">📄</span><span class="wu-btn-label">Handbuch (PDF)</span>
+          <span class="wu-btn-icon">📄</span><span class="wu-btn-label">Leitfaden bald Verfügbar</span>
         </a>
       </div>
 
