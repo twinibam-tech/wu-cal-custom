@@ -885,42 +885,90 @@
   new MutationObserver(hideSortBox).observe(document.documentElement, { childList:true, subtree:true });
 })();
 /* ============================================================================
-   WU – Raumausstattung-Block ersetzen durch externen Link
+   WU – "WU Rauminformationstool" im Bereich "Raumausstattung" verlinken
+   - Sucht Headline "Raumausstattung"
+   - Verlinkt das Wort/den Ausdruck im Text
+   - Falls kein passender Text da ist: fügt einen separaten Link unten ein
    ========================================================================== */
 (function () {
   const LINK_URL = "https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1";
+  // tolerante Muster (Tippfehler/Varianten)
+  const LINK_TEXT_RX = /\bwu\s+rauminfo(?:rmations)?tool\b/i;
 
-  function replaceRoomEquipment() {
-    // finde die Box mit dem Titel "Raumausstattung"
-    const headers = Array.from(document.querySelectorAll('h2, h3, .mat-headline, .mat-subtitle, strong'))
+  function findEquipmentSection() {
+    const heads = Array.from(document.querySelectorAll('h2, h3, .mat-headline, .mat-subtitle, strong'))
       .filter(el => /raumausstattung/i.test(el.textContent || ''));
+    if (!heads.length) return null;
+    return heads[0].closest('section, .mat-card, .mat-mdc-card, .mat-expansion-panel, div') || heads[0].parentElement;
+  }
 
-    for (const header of headers) {
-      const section = header.closest('section, div, .mat-card, .mat-expansion-panel, .mat-mdc-card') || header.parentElement;
-      if (!section) continue;
+  function linkifyTextNodes(root) {
+    let linked = false;
+    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const t = (node.nodeValue || '').trim();
+        return LINK_TEXT_RX.test(t) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+      }
+    });
+    const toChange = [];
+    while (tw.nextNode()) toChange.push(tw.currentNode);
 
-      // vorhandenen Inhalt löschen
-      const content = section.querySelector('p, .mat-body, .mat-mdc-card-content, div');
-      if (content) content.innerHTML = '';
+    toChange.forEach(node => {
+      const text = node.nodeValue;
+      const m = LINK_TEXT_RX.exec(text);
+      if (!m) return;
 
-      // neuen Absatz + Link einfügen
-      const p = document.createElement('p');
-      p.innerHTML = `
-        Kontaktieren Sie das Veranstaltungshaus, um mehr über die vorhandenen Komponenten zu erfahren.
-        <br><br>
-        <a href="${LINK_URL}" target="_blank" rel="noopener" style="font-weight:600; color:#005aa0; text-decoration:underline;">
-          ➜ Details zu den Räumen auf der WU-Webseite
-        </a>
-      `;
+      const before = text.slice(0, m.index);
+      const match  = text.slice(m.index, m.index + m[0].length);
+      const after  = text.slice(m.index + m[0].length);
 
-      section.appendChild(p);
-    }
+      const a = document.createElement('a');
+      a.href = LINK_URL;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = match.replace(/\s+/g,' ').trim();
+      a.style.fontWeight = '600';
+      a.style.textDecoration = 'underline';
+
+      const frag = document.createDocumentFragment();
+      if (before) frag.appendChild(document.createTextNode(before));
+      frag.appendChild(a);
+      if (after)  frag.appendChild(document.createTextNode(after));
+
+      node.parentNode.replaceChild(frag, node);
+      linked = true;
+    });
+
+    return linked;
+  }
+
+  function ensureExtraLink(container) {
+    if (container.querySelector('#wu-roominfo-extra-link')) return;
+    const p = document.createElement('p');
+    p.id = 'wu-roominfo-extra-link';
+    p.style.marginTop = '10px';
+    p.innerHTML = `<a href="${LINK_URL}" target="_blank" rel="noopener" style="font-weight:600; text-decoration:underline;">
+      ➜ WU Rauminformationstool
+    </a>`;
+    container.appendChild(p);
+  }
+
+  function apply() {
+    const section = findEquipmentSection();
+    if (!section) return;
+
+    // erst versuchen, vorhandenen Text zu verlinken
+    const linked = linkifyTextNodes(section);
+
+    // wenn im Abschnitt kein passender Text gefunden wurde, extra Link anhängen
+    if (!linked) ensureExtraLink(section);
   }
 
   (document.readyState === 'loading')
-    ? document.addEventListener('DOMContentLoaded', replaceRoomEquipment)
-    : replaceRoomEquipment();
+    ? document.addEventListener('DOMContentLoaded', apply)
+    : apply();
 
-  new MutationObserver(replaceRoomEquipment).observe(document.documentElement, {childList:true, subtree:true});
+  // SPA-Resilienz
+  new MutationObserver(() => apply())
+    .observe(document.documentElement, {childList:true, subtree:true});
 })();
-
