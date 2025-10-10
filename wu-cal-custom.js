@@ -884,4 +884,43 @@
   // SPA-Resilienz: bei DOM-Änderungen erneut anwenden
   new MutationObserver(hideSortBox).observe(document.documentElement, { childList:true, subtree:true });
 })();
+/* ============================================================================
+   WU – Raumausstattung-Block ersetzen durch externen Link
+   ========================================================================== */
+(function () {
+  const LINK_URL = "https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1";
+
+  function replaceRoomEquipment() {
+    // finde die Box mit dem Titel "Raumausstattung"
+    const headers = Array.from(document.querySelectorAll('h2, h3, .mat-headline, .mat-subtitle, strong'))
+      .filter(el => /raumausstattung/i.test(el.textContent || ''));
+
+    for (const header of headers) {
+      const section = header.closest('section, div, .mat-card, .mat-expansion-panel, .mat-mdc-card') || header.parentElement;
+      if (!section) continue;
+
+      // vorhandenen Inhalt löschen
+      const content = section.querySelector('p, .mat-body, .mat-mdc-card-content, div');
+      if (content) content.innerHTML = '';
+
+      // neuen Absatz + Link einfügen
+      const p = document.createElement('p');
+      p.innerHTML = `
+        Kontaktieren Sie das Veranstaltungshaus, um mehr über die vorhandenen Komponenten zu erfahren.
+        <br><br>
+        <a href="${LINK_URL}" target="_blank" rel="noopener" style="font-weight:600; color:#005aa0; text-decoration:underline;">
+          ➜ Details zu den Räumen auf der WU-Webseite
+        </a>
+      `;
+
+      section.appendChild(p);
+    }
+  }
+
+  (document.readyState === 'loading')
+    ? document.addEventListener('DOMContentLoaded', replaceRoomEquipment)
+    : replaceRoomEquipment();
+
+  new MutationObserver(replaceRoomEquipment).observe(document.documentElement, {childList:true, subtree:true});
+})();
 
