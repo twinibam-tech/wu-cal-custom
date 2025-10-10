@@ -850,3 +850,38 @@
   document.addEventListener('pointerdown', onPointerDown, {capture:true});
   window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') safeClose(); });
 })();
+
+// Sortieren-nach (formcontrolname="sortBy") vollständig ausblenden
+(function () {
+  function hideSortBox(){
+    // 1) das eigentliche Select finden
+    const sel = document.querySelector('mat-select[formcontrolname="sortBy"]');
+    if (!sel) return;
+
+    // 2) das umgebende Form-Field ausblenden
+    const field = sel.closest('mat-form-field, .mat-mdc-form-field');
+    if (field) field.style.display = 'none';
+
+    // 3) evtl. Überschrift "Sortieren nach" neben/oberhalb auch verstecken
+    const labelCandidates = [
+      field?.previousElementSibling,
+      field?.parentElement?.querySelector('label, .mat-mdc-form-field-label'),
+      field?.parentElement?.firstElementChild
+    ].filter(Boolean);
+
+    for (const el of labelCandidates) {
+      if (/(^|\s)sortieren\s*nach(\s|$)/i.test((el.textContent||'').trim())) {
+        el.style.display = 'none';
+        break;
+      }
+    }
+  }
+
+  (document.readyState === 'loading')
+    ? document.addEventListener('DOMContentLoaded', hideSortBox)
+    : hideSortBox();
+
+  // SPA-Resilienz: bei DOM-Änderungen erneut anwenden
+  new MutationObserver(hideSortBox).observe(document.documentElement, { childList:true, subtree:true });
+})();
+
