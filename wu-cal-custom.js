@@ -852,17 +852,16 @@
 })();
 
 /* ============================================================================
-   WU – "Sortieren nach": nur Kapazität (auf/ab) anzeigen & andere entfernen
-   Funktioniert mit Angular Material (mat-select) – greift auf das geöffnete
-   Overlay (cdk) zu und manipuliert die Optionsliste hart.
+   WU – "Sortieren nach": nur Kapazität (auf/ab) anzeigen & andere ausblenden
+   Greift auf das geöffnete Angular-Material-Overlay (cdk) zu.
    ========================================================================== */
 (function () {
-  // Erkennungsmerkmale
+  // Erkennungsmerkmale für das richtige mat-select
   const SELECT_MATCH = (el) =>
     el && el.tagName === 'MAT-SELECT' &&
     (el.getAttribute('formcontrolname') === 'sortBy' || /sortby/i.test(el.className));
 
-  // Erlaubte Optionen (exakte Reihenfolge)
+  // Erlaubte Optionen (Reihenfolge beibehalten)
   const ALLOWED = [
     /Kapazität\s*\(\s*gering\s*bis\s*groß\s*\)/i,  // ASC
     /Kapazität\s*\(\s*groß\s*bis\s*gering\s*\)/i   // DESC
@@ -872,47 +871,46 @@
 
   function cleanPanelFor(selectEl, panelEl) {
     if (!panelEl || panelEl.__wuCleaned) return;
-    // Sammle alle mat-option
+
     const options = Array.from(panelEl.querySelectorAll('.mat-mdc-option'));
     if (!options.length) return;
 
-    // Behalte nur erlaubte; alles andere entfernen
     const keep = [];
     for (const opt of options) {
       const label = (opt.textContent || '').replace(/\s+/g, ' ').trim();
-      if (isAllowed(label)) keep.push({ opt, label });
-      else opt.remove();
+
+      if (isAllowed(label)) {
+        // Erlaubte sichtbar halten
+        opt.style.display = '';
+        opt.removeAttribute('aria-hidden');
+        keep.push({ opt, label });
+      } else {
+        // Nicht entfernen → nur ausblenden (stabil für Keyboard/Focus)
+        opt.setAttribute('aria-hidden', 'true');
+        opt.style.display = 'none';
+        opt.classList.add('wu-hidden-option');
+      }
     }
 
-    if (!keep.length) return; // Falls sich Texte ändern, lieber nichts kaputt machen
+    if (!keep.length) return;
 
-    // Reihenfolge gemäß ALLOWED herstellen
+    // Reihenfolge entsprechend ALLOWED erzwingen
     keep.sort((a, b) => {
       const ia = ALLOWED.findIndex(rx => rx.test(a.label));
       const ib = ALLOWED.findIndex(rx => rx.test(b.label));
       return ia - ib;
     });
-    // neu einhängen (sortierte Reihenfolge)
+
     const list = panelEl.querySelector('.mat-mdc-select-panel, .mdc-list') || panelEl;
     keep.forEach(k => list.appendChild(k.opt));
 
-    // Panel markieren, damit wir nicht mehrfach arbeiten
+    // Markieren, damit nicht mehrfach gearbeitet wird
     panelEl.__wuCleaned = true;
 
-    // Optional: Wenn gerade eine nicht mehr existierende Auswahl angezeigt wird,
-    // auf erste erlaubte Option umschalten (sanft, ohne Model zu zerstören).
-    try {
-      const trigger = selectEl.querySelector('.mat-mdc-select-value-text');
-      const current = (trigger?.textContent || '').replace(/\s+/g, ' ').trim();
-      if (!isAllowed(current)) {
-        // Klicke programmgesteuert die erste erlaubte Option
-        keep[0]?.opt?.click?.();
-      }
-    } catch {}
+    // Kein Auto-Click! Auswahl bleibt, Sortierung funktioniert normal.
   }
 
-  // Beobachte alle mat-selects; sobald eines aufgeht (aria-expanded="true"),
-  // greife auf das zuletzt erzeugte Panel zu und säubere es.
+  // Beobachte relevante mat-selects; beim Öffnen säubern
   function watchSelects(root = document) {
     const selects = new Set();
     root.querySelectorAll('mat-select').forEach(s => { if (SELECT_MATCH(s)) selects.add(s); });
@@ -921,21 +919,21 @@
       if (selectEl.__wuObserved) return;
       selectEl.__wuObserved = true;
 
-      // Wenn das Panel aufgeht, ist aria-expanded = true und in der DOM erscheint
-      // ein .mat-mdc-select-panel in der .cdk-overlay-container
       const obs = new MutationObserver(() => {
         const expanded = selectEl.getAttribute('aria-expanded') === 'true';
         if (!expanded) return;
-        // nimm das neueste Panel
+
+        // Neueste Panel-Instanz aus dem Overlay-Container greifen
         const panels = document.querySelectorAll('.cdk-overlay-container .mat-mdc-select-panel');
         const panelEl = panels[panels.length - 1];
         cleanPanelFor(selectEl, panelEl);
       });
+
       obs.observe(selectEl, { attributes: true, attributeFilter: ['aria-expanded'] });
     });
   }
 
-  // Initial + SPA-Resilienz
+  // Init + SPA-Resilienz
   (document.readyState === 'loading')
     ? document.addEventListener('DOMContentLoaded', () => watchSelects())
     : watchSelects();
