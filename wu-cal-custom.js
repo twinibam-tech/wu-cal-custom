@@ -4,6 +4,21 @@
   const STYLE_ID = "wu-inline-css";
 
   const CSS = `
+  /* Einheitliche Schriftgröße in Datum / Startzeit / Endzeit / Teilnehmerzahl */
+.mat-mdc-form-field-infix input[type="text"],
+.mat-mdc-form-field-infix input[type="number"],
+.mat-mdc-form-field-infix .mat-mdc-select-value {
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+}
+
+/* Label & Placeholder auf gleiche Höhe bringen */
+.mat-mdc-form-field-label {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
 /* Header-Logo leicht nach innen & responsive */
 .usi-gradientbackground{ position:relative; padding-right:clamp(120px,12vw,220px)!important; }
 .usi-gradientbackground::after{
