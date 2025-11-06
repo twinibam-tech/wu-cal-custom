@@ -289,13 +289,19 @@ function timeFromClick(cell, clientX) {
   }
 
   ensureStyle();
-  document.addEventListener("click", ev => {
-    const cell = bookedCellFromTarget(ev.target) || document.elementFromPoint(ev.clientX, ev.clientY);
-    if (!cell || !isBookedCell(cell)) return;
-    const [from,to] = timeFromClick(cell, ev.clientX);
-    const room = getRoomLabel(cell, ev.clientX, ev.clientY);
-    openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
-  }, true);
+document.addEventListener("click", ev => {
+  const el = document.elementFromPoint(ev.clientX, ev.clientY);
+  const cell = bookedCellFromTarget(ev.target) || el;
+  if (!cell) return;
+
+  const [from,to] = timeFromClick(cell, ev.clientX);
+  const hour = parseInt((from || "").slice(0,2), 10);
+
+  if (!isBookedCell(cell) && (isNaN(hour) || hour < 21)) return;
+
+  const room = getRoomLabel(cell, ev.clientX, ev.clientY);
+  openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
+}, true);
 })(); // IIFE 2
 
 /* ============================================================================
