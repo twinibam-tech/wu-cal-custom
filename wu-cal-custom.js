@@ -173,31 +173,38 @@
   }
 
 function getRoomLabel(cell, x, y) {
+  // 1️⃣ Reihe der Zelle holen
   const row = cell.closest(".chadmo-row") || cell.parentElement;
+  if (!row) return "Raum unbekannt";
 
-  // 1️⃣ Versuche zuerst: Text der ersten Spalte in der Zeile
-  if (row) {
-    const firstCell = row.querySelector('.chadmo-cell:first-child, [id="0"]');
-    if (firstCell) {
-      const text = (firstCell.textContent || "").trim();
-      if (text && !/^(\s*|&nbsp;|Dieser Raum)$/i.test(text)) return text;
+  // 2️⃣ Versuche, aus der ersten Spalte der Zeile den Namen zu holen
+  const firstCell =
+    row.querySelector('[id="0"], .left0, .chadmo-cell:first-child');
+  if (firstCell) {
+    const text = (firstCell.textContent || "").trim();
+    if (text && /^[A-Z]{1,2}\.\d+\.\d+/.test(text)) { 
+      // Muster: z. B. AD.0.114 Sitzungsraum 1
+      window.__lastRoomLabel = text;
+      return text;
     }
   }
 
-  // 2️⃣ Fallback: Suche nach dem nächsten sichtbaren Raumnamen links vom Klick
+  // 3️⃣ Suche in der Nähe (nach links) nach einem Raum mit typischem Muster
   for (let dx = 10; dx <= 600; dx += 30) {
     const el = document.elementFromPoint(Math.max(0, x - dx), y);
     if (!el) continue;
-    const text = (el.textContent || "").trim();
-    if (text && text.length > 1 && text.length < 100 && !/^\d{1,2}:\d{2}$/.test(text))
-      return text;
+    const txt = (el.textContent || "").trim();
+    if (txt && /^[A-Z]{1,2}\.\d+\.\d+/.test(txt)) {
+      window.__lastRoomLabel = txt;
+      return txt;
+    }
   }
 
-  // 3️⃣ Fallback: letzte bekannte Raumnummer merken
-  if (window.__lastRoomLabel && typeof window.__lastRoomLabel === "string")
-    return window.__lastRoomLabel;
+  // 4️⃣ Fallback: letzter bekannter Raumname
+  if (window.__lastRoomLabel) return window.__lastRoomLabel;
 
-  return "Raum nicht verfügbar";
+  // 5️⃣ Wenn nichts gefunden → Standardtext
+  return "Raum unbekannt";
 }
 
 // 💾 zusätzlich merken, sobald einmal ein echter Raumname erkannt wird
