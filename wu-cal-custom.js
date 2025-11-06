@@ -4,7 +4,7 @@
   const STYLE_ID = "wu-inline-css";
 
   const CSS = `
-/* Einheitliche Schriftgrößen & vertikale Ausrichtung für alle Eingabefelder oben */
+  /* Einheitliche Schriftgrößen & vertikale Ausrichtung für alle Eingabefelder oben */
 .mat-mdc-form-field-infix input,
 .mat-mdc-select-value-text,
 .mat-mdc-form-field-infix .mat-mdc-select-value,
@@ -35,7 +35,6 @@
   padding-top: 6px !important;
   padding-bottom: 6px !important;
 }
-
 
 /* Header-Logo leicht nach innen & responsive */
 .usi-gradientbackground{ position:relative; padding-right:clamp(120px,12vw,220px)!important; }
@@ -205,51 +204,23 @@
     const m = RE.exec(document.body.innerText || ""); return m ? m[0] : "";
   }
 
-function getRoomLabel(cell, x, y) {
-  // 1️⃣ Reihe der Zelle holen
-  const row = cell.closest(".chadmo-row") || cell.parentElement;
-  if (!row) return "Raum unbekannt";
-
-  // 2️⃣ Versuche, aus der ersten Spalte der Zeile den Namen zu holen
-  const firstCell =
-    row.querySelector('[id="0"], .left0, .chadmo-cell:first-child');
-  if (firstCell) {
-    const text = (firstCell.textContent || "").trim();
-    if (text && /^[A-Z]{1,2}\.\d+\.\d+/.test(text)) { 
-      // Muster: z. B. AD.0.114 Sitzungsraum 1
-      window.__lastRoomLabel = text;
-      return text;
+  function getRoomLabel(cell, x, y){
+    const row = cell.closest(".chadmo-row") || cell.parentElement;
+    if (row){
+      const leftCell = row.querySelector('div[id="0"]') || row.querySelector('.left0') || row.firstElementChild;
+      if (leftCell){
+        const t = (leftCell.textContent || "").replace(/\s+/g," ").trim(); if (t) return t;
+      }
     }
+    for (const dx of [60,100,160,220,300,380]){
+      const el = document.elementFromPoint(Math.max(0, x - dx), y);
+      if (row && el && el.closest(".chadmo-row") !== row) continue;
+      const t = (el && el.textContent || "").replace(/\s+/g," ").trim();
+      if (t && t.length < 80) return t;
+    }
+    return "Dieser Raum";
   }
 
-  // 3️⃣ Suche in der Nähe (nach links) nach einem Raum mit typischem Muster
-  for (let dx = 10; dx <= 600; dx += 30) {
-    const el = document.elementFromPoint(Math.max(0, x - dx), y);
-    if (!el) continue;
-    const txt = (el.textContent || "").trim();
-    if (txt && /^[A-Z]{1,2}\.\d+\.\d+/.test(txt)) {
-      window.__lastRoomLabel = txt;
-      return txt;
-    }
-  }
-
-  // 4️⃣ Fallback: letzter bekannter Raumname
-  if (window.__lastRoomLabel) return window.__lastRoomLabel;
-
-  // 5️⃣ Wenn nichts gefunden → Standardtext
-  return "Raum unbekannt";
-}
-
-// 💾 zusätzlich merken, sobald einmal ein echter Raumname erkannt wird
-document.addEventListener("mousemove", e => {
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  if (!el) return;
-  const t = (el.textContent || "").trim();
-  if (t && t.length > 1 && t.length < 100 && !/^\d{1,2}:\d{2}$/.test(t))
-    window.__lastRoomLabel = t;
-}, { passive: true });
-
-  
   function measureRow(row){
     const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
     if (!cells.length) return null;
@@ -265,20 +236,17 @@ document.addEventListener("mousemove", e => {
     const startHour = 8; const len = colCount + 1;
     return Array.from({length: len}, (_,i) => String(startHour+i).padStart(2,"0")+":00");
   }
-function timeFromClick(cell, clientX) {
-  const row = cell.closest(".chadmo-row") || cell.parentElement;
-  const m = measureRow(row);
-  if (!m) return ["", ""];
-  const bounds = timeBoundaries(m.colCount);
-  const minX = m.left0;
-  const maxX = m.left0 + m.width * m.colCount;
-  const clampedX = Math.min(Math.max(clientX, minX), maxX - 1);
-  let idx = Math.floor((clampedX - m.left0) / m.width);
-  if (idx >= m.colCount - 1) idx = m.colCount - 1;
-  const from = bounds[idx];
-  const to = bounds[idx + 1] || "22:00";
-  return [from, to];
-}
+  function timeFromClick(cell, clientX){
+    const row = cell.closest(".chadmo-row") || cell.parentElement;
+    const m = measureRow(row); if (!m) return ["",""];
+    const bounds = timeBoundaries(m.colCount);
+    const minX = m.left0, maxX = m.left0 + m.width * m.colCount - 0.001;
+    const clampedX = Math.min(Math.max(clientX, minX), maxX);
+    let idx = Math.floor((clampedX - m.left0) / m.width);
+    idx = Math.max(0, Math.min(idx, m.colCount - 1));
+    return [bounds[idx], bounds[idx+1]];
+  }
+
   function near216Grey(c){ const m = c && c.match(/\d+/g); if(!m) return false;
     const [r,g,b] = m.map(Number), tol = 14;
     return Math.abs(r-216)<=tol && Math.abs(g-217)<=tol && Math.abs(b-218)<=tol; }
@@ -323,11 +291,9 @@ function timeFromClick(cell, clientX) {
   }
   function openPopover({x,y,room,from,to}){
     ensureStyle(); ensurePopover();
-pop.querySelector(".time").textContent = (from && to) ? `${from} – ${to}` : "–";
-pop.querySelector(".date").textContent = dateLabel();
-const roomLine = pop.querySelector(".line .room")?.closest(".line");
-if (roomLine) roomLine.remove();
-
+    pop.querySelector(".room").textContent = room;
+    pop.querySelector(".time").textContent = (from&&to)? `${from} – ${to}` : "–";
+    pop.querySelector(".date").textContent = dateLabel();
 
     pop.style.visibility="hidden";
     pop.classList.add("is-open");
@@ -352,19 +318,13 @@ if (roomLine) roomLine.remove();
   }
 
   ensureStyle();
-document.addEventListener("click", ev => {
-  const el = document.elementFromPoint(ev.clientX, ev.clientY);
-  const cell = bookedCellFromTarget(ev.target) || el;
-  if (!cell) return;
-
-  const [from,to] = timeFromClick(cell, ev.clientX);
-  const hour = parseInt((from || "").slice(0,2), 10);
-
-  if (!isBookedCell(cell) && (isNaN(hour) || hour < 21)) return;
-
-  const room = getRoomLabel(cell, ev.clientX, ev.clientY);
-  openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
-}, true);
+  document.addEventListener("click", ev => {
+    const cell = bookedCellFromTarget(ev.target) || document.elementFromPoint(ev.clientX, ev.clientY);
+    if (!cell || !isBookedCell(cell)) return;
+    const [from,to] = timeFromClick(cell, ev.clientX);
+    const room = getRoomLabel(cell, ev.clientX, ev.clientY);
+    openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
+  }, true);
 })(); // IIFE 2
 
 /* ============================================================================
