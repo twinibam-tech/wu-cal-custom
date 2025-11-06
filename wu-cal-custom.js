@@ -204,18 +204,20 @@
     const startHour = 8; const len = colCount + 1;
     return Array.from({length: len}, (_,i) => String(startHour+i).padStart(2,"0")+":00");
   }
-  function timeFromClick(cell, clientX){
-    const row = cell.closest(".chadmo-row") || cell.parentElement;
-    const m = measureRow(row); if (!m) return ["",""];
-    const bounds = timeBoundaries(m.colCount);
-    const minX = m.left0, maxX = m.left0 + m.width * m.colCount - 0.001;
-    const clampedX = Math.min(Math.max(clientX, minX), maxX);
-    let idx = Math.floor((clampedX - m.left0) / m.width);
-    if (idx >= m.colCount - 1) idx = m.colCount - 2;
-    idx = Math.max(0, idx);
-    return [bounds[idx], bounds[idx+1]];
-  }
-
+function timeFromClick(cell, clientX) {
+  const row = cell.closest(".chadmo-row") || cell.parentElement;
+  const m = measureRow(row);
+  if (!m) return ["", ""];
+  const bounds = timeBoundaries(m.colCount);
+  const minX = m.left0;
+  const maxX = m.left0 + m.width * m.colCount;
+  const clampedX = Math.min(Math.max(clientX, minX), maxX - 1);
+  let idx = Math.floor((clampedX - m.left0) / m.width);
+  if (idx >= m.colCount - 1) idx = m.colCount - 1;
+  const from = bounds[idx];
+  const to = bounds[idx + 1] || "22:00";
+  return [from, to];
+}
   function near216Grey(c){ const m = c && c.match(/\d+/g); if(!m) return false;
     const [r,g,b] = m.map(Number), tol = 14;
     return Math.abs(r-216)<=tol && Math.abs(g-217)<=tol && Math.abs(b-218)<=tol; }
