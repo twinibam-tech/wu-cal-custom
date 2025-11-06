@@ -324,14 +324,56 @@ document.addEventListener("click", ev => {
   const cell = bookedCellFromTarget(ev.target) || el;
   if (!cell) return;
 
+  // Prüfen, ob Wochenansicht aktiv ist
+  const isWeekView = !!document.querySelector('.chadmo-gridsView .header-column:nth-of-type(3) .mergedHeaderContent')
+                     && document.querySelector('.chadmo-gridsView .header-column .mergedHeaderContent')?.textContent?.match(/\bMO\b|Montag/i);
+
+  if (isWeekView) {
+    if (!isBookedCell(cell)) return;
+    const row = cell.closest(".chadmo-row");
+    const firstCell = row?.querySelector('.chadmo-cell:first-child');
+    const room = (firstCell?.textContent || "").trim() || "Raum unbekannt";
+    const dayIdx = Array.from(row?.querySelectorAll('.chadmo-cell')).indexOf(cell);
+    const dayName = document.querySelectorAll('.header-column .mergedHeaderContent')[dayIdx]?.textContent?.trim() || "diesem Tag";
+    openPopover({
+      x: ev.clientX,
+      y: ev.clientY,
+      room,
+      from: "",
+      to: "",
+      weekView: true,
+      day: dayName
+    });
+    return;
+  }
+
+  // Tagesansicht (mit Uhrzeiten)
   const [from,to] = timeFromClick(cell, ev.clientX);
   const hour = parseInt((from || "").slice(0,2), 10);
-
   if (!isBookedCell(cell) && (isNaN(hour) || hour < 21)) return;
 
   const room = getRoomLabel(cell, ev.clientX, ev.clientY);
   openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
 }, true);
+function openPopover({x,y,room,from,to,weekView=false,day=""}) {
+  ensureStyle(); ensurePopover();
+
+  if (weekView) {
+    pop.querySelector(".body").innerHTML = `
+      <div class="line"><div class="label">Tag</div><div class="value">${day}</div></div>
+      <div class="line"><div class="label">Datum</div><div class="value date muted">${dateLabel()}</div></div>
+      <div class="line muted" style="margin-top:10px">
+        Der Raum <b>${room}</b> ist an diesem Tag teilweise oder vollständig belegt.
+      </div>`;
+  } else {
+    pop.querySelector(".body").innerHTML = `
+      <div class="line"><div class="label">Zeit</div><div class="value">${(from&&to)? `${from} – ${to}` : "–"}</div></div>
+      <div class="line"><div class="label">Datum</div><div class="value date muted">${dateLabel()}</div></div>
+      <div class="line muted" style="margin-top:10px">
+        Dieser Raum ist im gewählten Zeitfenster bereits belegt.
+      </div>`;
+  }
+
 })(); // IIFE 2
 
 /* ============================================================================
