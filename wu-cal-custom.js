@@ -4,20 +4,38 @@
   const STYLE_ID = "wu-inline-css";
 
   const CSS = `
-  /* Einheitliche Schriftgröße in Datum / Startzeit / Endzeit / Teilnehmerzahl */
-.mat-mdc-form-field-infix input[type="text"],
-.mat-mdc-form-field-infix input[type="number"],
-.mat-mdc-form-field-infix .mat-mdc-select-value {
+/* Einheitliche Schriftgrößen & vertikale Ausrichtung für alle Eingabefelder oben */
+.mat-mdc-form-field-infix input,
+.mat-mdc-select-value-text,
+.mat-mdc-form-field-infix .mat-mdc-select-value,
+.mat-mdc-form-field-infix .mat-mdc-form-field-label,
+.mat-mdc-form-field-infix {
   font-size: 15px !important;
   font-weight: 500 !important;
-  line-height: 1.3 !important;
+  line-height: 1.4 !important;
+  vertical-align: middle !important;
 }
 
-/* Label & Placeholder auf gleiche Höhe bringen */
+/* Label konsistent */
 .mat-mdc-form-field-label {
   font-size: 14px !important;
   font-weight: 500 !important;
+  opacity: 0.9 !important;
 }
+
+/* Dropdown-Pfeile und Kalender-Icons anpassen */
+.mat-mdc-select-arrow,
+.mat-datepicker-toggle-default-icon {
+  transform: scale(1.05);
+  opacity: 0.8;
+}
+
+/* Abstand innerhalb der Felder angleichen */
+.mat-mdc-form-field-infix {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
 
 /* Header-Logo leicht nach innen & responsive */
 .usi-gradientbackground{ position:relative; padding-right:clamp(120px,12vw,220px)!important; }
