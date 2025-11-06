@@ -211,7 +211,8 @@
     const minX = m.left0, maxX = m.left0 + m.width * m.colCount - 0.001;
     const clampedX = Math.min(Math.max(clientX, minX), maxX);
     let idx = Math.floor((clampedX - m.left0) / m.width);
-    idx = Math.max(0, Math.min(idx, m.colCount - 1));
+    if (idx >= m.colCount - 1) idx = m.colCount - 2;
+    idx = Math.max(0, idx);
     return [bounds[idx], bounds[idx+1]];
   }
 
