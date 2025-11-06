@@ -174,28 +174,41 @@
 
 function getRoomLabel(cell, x, y) {
   const row = cell.closest(".chadmo-row") || cell.parentElement;
+
+  // 1️⃣ Versuche zuerst: Text der ersten Spalte in der Zeile
   if (row) {
-    const leftCell =
-      row.querySelector('div[id="0"]') ||
-      row.querySelector('.left0') ||
-      row.querySelector('.chadmo-cell:first-child') ||
-      row.firstElementChild;
-    if (leftCell) {
-      const text = (leftCell.textContent || "").trim();
-      if (text && text.length > 0 && !/^(\s*|&nbsp;)$/.test(text)) return text;
+    const firstCell = row.querySelector('.chadmo-cell:first-child, [id="0"]');
+    if (firstCell) {
+      const text = (firstCell.textContent || "").trim();
+      if (text && !/^(\s*|&nbsp;|Dieser Raum)$/i.test(text)) return text;
     }
   }
 
-  // Backup: nimm das Element links vom Klickpunkt
-  for (let dx = 20; dx <= 400; dx += 40) {
+  // 2️⃣ Fallback: Suche nach dem nächsten sichtbaren Raumnamen links vom Klick
+  for (let dx = 10; dx <= 600; dx += 30) {
     const el = document.elementFromPoint(Math.max(0, x - dx), y);
     if (!el) continue;
     const text = (el.textContent || "").trim();
-    if (text && text.length > 0 && text.length < 80) return text;
+    if (text && text.length > 1 && text.length < 100 && !/^\d{1,2}:\d{2}$/.test(text))
+      return text;
   }
 
-  return "Nicht verfügbar";
+  // 3️⃣ Fallback: letzte bekannte Raumnummer merken
+  if (window.__lastRoomLabel && typeof window.__lastRoomLabel === "string")
+    return window.__lastRoomLabel;
+
+  return "Raum nicht verfügbar";
 }
+
+// 💾 zusätzlich merken, sobald einmal ein echter Raumname erkannt wird
+document.addEventListener("mousemove", e => {
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if (!el) return;
+  const t = (el.textContent || "").trim();
+  if (t && t.length > 1 && t.length < 100 && !/^\d{1,2}:\d{2}$/.test(t))
+    window.__lastRoomLabel = t;
+}, { passive: true });
+
   
   function measureRow(row){
     const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
