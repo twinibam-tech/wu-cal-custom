@@ -268,21 +268,27 @@
     if(!backdrop){ backdrop=document.createElement("div"); backdrop.id=POPOVER_ID+"-backdrop";
       backdrop.addEventListener("click", closePopover, {passive:true}); document.body.appendChild(backdrop); }
     if(!pop){ pop=document.createElement("div"); pop.id=POPOVER_ID;
-pop.innerHTML = `
-  <div class="card">
-    <div class="header"><div class="dot">!</div><div class="title">Nicht verfügbar</div></div>
-    <div class="body">
-      <div class="line"><div class="label">Zeit</div><div class="value time"></div></div>
-      <div class="line"><div class="label">Datum</div><div class="value date muted"></div></div>
-      <div class="line muted" style="margin-top:10px">Dieser Zeitraum ist bereits belegt.</div>
-    </div>
-    <div class="footer">
-      <button class="closeBtn">Schließen</button>
-      <button class="primary okBtn">Ok</button>
-    </div>
-  </div>
-  <div class="arrow"></div>`;
-
+      pop.innerHTML = `
+        <div class="card">
+          <div class="header"><div class="dot">!</div><div class="title">Nicht verfügbar</div></div>
+          <div class="body">
+            <div class="line"><div class="label">Raum</div><div class="value room"></div></div>
+            <div class="line"><div class="label">Zeit</div><div class="value time"></div></div>
+            <div class="line"><div class="label">Datum</div><div class="value date muted"></div></div>
+            <div class="line muted" style="margin-top:10px">Dieser Raum ist im gewählten Zeitfenster bereits belegt.</div>
+          </div>
+          <div class="footer">
+            <button class="closeBtn">Schließen</button>
+            <button class="primary okBtn">Ok</button>
+          </div>
+        </div>
+        <div class="arrow"></div>`;
+      document.body.appendChild(pop);
+      pop.querySelector(".closeBtn").onclick = closePopover;
+      pop.querySelector(".okBtn").onclick = closePopover;
+      window.addEventListener("keydown", e => { if (e.key === "Escape") closePopover(); });
+    }
+  }
   function openPopover({x,y,room,from,to}){
     ensureStyle(); ensurePopover();
     pop.querySelector(".room").textContent = room;
