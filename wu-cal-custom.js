@@ -290,9 +290,11 @@ function timeFromClick(cell, clientX) {
   }
   function openPopover({x,y,room,from,to}){
     ensureStyle(); ensurePopover();
-    pop.querySelector(".room").textContent = room;
-    pop.querySelector(".time").textContent = (from&&to)? `${from} – ${to}` : "–";
-    pop.querySelector(".date").textContent = dateLabel();
+pop.querySelector(".time").textContent = (from && to) ? `${from} – ${to}` : "–";
+pop.querySelector(".date").textContent = dateLabel();
+const roomLine = pop.querySelector(".line .room")?.closest(".line");
+if (roomLine) roomLine.remove();
+
 
     pop.style.visibility="hidden";
     pop.classList.add("is-open");
