@@ -118,42 +118,48 @@
 
 
 /* ============================================================================
-   WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
-   V7: exakte Zeit inkl. rechter Rand (21–22), robustes X-Clamping
+   WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar" – V8
+   - Tagesansicht: zeigt Zeit + Datum
+   - Wochenansicht: zeigt Tag + Datum (keine Zeiten)
+   - Raumzeile entfernt
    ============================================================================ */
 (function () {
-  const STYLE_ID = "wu-unavail-v7-style";
+  const STYLE_ID = "wu-unavail-v8-style";
   const POPOVER_ID = "wu-unavail-popover";
 
   const CSS = `
-#${POPOVER_ID}-backdrop{ position:fixed; inset:0; background:rgba(10,14,19,.25);
-  -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
-  opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:999998; }
-#${POPOVER_ID}-backdrop.is-open{ opacity:1; pointer-events:auto; }
-#${POPOVER_ID}{ position:fixed; min-width:320px; max-width:min(92vw,520px);
-  color:#0b1a11; z-index:999999; transform-origin:var(--ox,center) var(--oy,center);
-  transform:scale(.96) translateY(-2px); opacity:0; pointer-events:none;
-  transition:transform .18s cubic-bezier(.2,.7,.2,1), opacity .18s ease; }
-#${POPOVER_ID}.is-open{ opacity:1; transform:scale(1) translateY(0); pointer-events:auto; }
-#${POPOVER_ID} .card{ background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.82));
-  border:1px solid rgba(26,54,35,.12); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; }
-#${POPOVER_ID} .header{ display:flex; gap:10px; align-items:center; padding:14px 16px 6px; }
-#${POPOVER_ID} .dot{ width:22px; height:22px; border-radius:50%; background:conic-gradient(from 180deg,#e53935,#ef5350);
-  box-shadow:0 0 0 3px #fff inset, 0 0 0 1px rgba(0,0,0,.06); display:inline-grid; place-items:center; color:#fff; font-weight:800; }
-#${POPOVER_ID} .title{ font:600 16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
-#${POPOVER_ID} .body{ padding:6px 16px 14px; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
-#${POPOVER_ID} .line{ display:flex; gap:8px; align-items:flex-start; margin-top:6px; }
-#${POPOVER_ID} .label{ min-width:74px; color:#33543f; font-weight:600; }
-#${POPOVER_ID} .value{ flex:1 1 auto; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-#${POPOVER_ID} .muted{ color:#33543fa8; }
-#${POPOVER_ID} .footer{ display:flex; justify-content:flex-end; gap:10px; padding:10px 12px 12px; background:rgba(27,94,32,.06); }
-#${POPOVER_ID} button{ appearance:none; border:1px solid rgba(27,94,32,.24); background:#fff;
-  padding:8px 12px; border-radius:8px; font:600 13px/1 system-ui; cursor:pointer; }
-#${POPOVER_ID} button.primary{ background:#1b5e20; color:#fff; border-color:#1b5e20; }
-#${POPOVER_ID} .arrow{ position:absolute; width:14px; height:14px; transform:rotate(45deg); background:inherit; border:inherit; }
+#${POPOVER_ID}-backdrop{position:fixed;inset:0;background:rgba(10,14,19,.25);
+-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+opacity:0;pointer-events:none;transition:opacity .18s ease;z-index:999998;}
+#${POPOVER_ID}-backdrop.is-open{opacity:1;pointer-events:auto;}
+#${POPOVER_ID}{position:fixed;min-width:320px;max-width:min(92vw,520px);
+color:#0b1a11;z-index:999999;transform-origin:var(--ox,center) var(--oy,center);
+transform:scale(.96) translateY(-2px);opacity:0;pointer-events:none;
+transition:transform .18s cubic-bezier(.2,.7,.2,1),opacity .18s ease;}
+#${POPOVER_ID}.is-open{opacity:1;transform:scale(1) translateY(0);pointer-events:auto;}
+#${POPOVER_ID} .card{background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.82));
+border:1px solid rgba(26,54,35,.12);border-radius:14px;
+box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;}
+#${POPOVER_ID} .header{display:flex;gap:10px;align-items:center;padding:14px 16px 6px;}
+#${POPOVER_ID} .dot{width:22px;height:22px;border-radius:50%;
+background:conic-gradient(from 180deg,#e53935,#ef5350);
+box-shadow:0 0 0 3px #fff inset,0 0 0 1px rgba(0,0,0,.06);
+display:inline-grid;place-items:center;color:#fff;font-weight:800;}
+#${POPOVER_ID} .title{font:600 16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+#${POPOVER_ID} .body{padding:6px 16px 14px;font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+#${POPOVER_ID} .line{display:flex;gap:8px;align-items:flex-start;margin-top:6px;}
+#${POPOVER_ID} .label{min-width:74px;color:#33543f;font-weight:600;}
+#${POPOVER_ID} .value{flex:1 1 auto;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#${POPOVER_ID} .muted{color:#33543fa8;}
+#${POPOVER_ID} .footer{display:flex;justify-content:flex-end;gap:10px;padding:10px 12px 12px;background:rgba(27,94,32,.06);}
+#${POPOVER_ID} button{appearance:none;border:1px solid rgba(27,94,32,.24);background:#fff;
+padding:8px 12px;border-radius:8px;font:600 13px/1 system-ui;cursor:pointer;}
+#${POPOVER_ID} button.primary{background:#1b5e20;color:#fff;border-color:#1b5e20;}
+#${POPOVER_ID} .arrow{position:absolute;width:14px;height:14px;transform:rotate(45deg);
+background:inherit;border:inherit;}
 `;
 
-  function ensureStyle(){
+  function ensureStyle() {
     if (!document.getElementById(STYLE_ID)) {
       const s = document.createElement("style");
       s.id = STYLE_ID;
@@ -162,120 +168,85 @@
     }
   }
 
-  function dateLabel(){
+  function dateLabel() {
     const RE = /\b(?:Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag),?\s+(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+\d{1,2},?\s+\d{4}\b/;
-    const nodes = document.querySelectorAll(".usi-calendarHeader, .chadmo-gridsView .header, .usi-calendarHeader *, .chadmo-gridsView .header *, h1, h2");
-    for (const n of nodes){
-      const t = (n.textContent || "").replace(/\s+/g," ").trim();
-      const m = RE.exec(t); if (m) return m[0];
+    const nodes = document.querySelectorAll(".usi-calendarHeader, .chadmo-gridsView .header, h1, h2");
+    for (const n of nodes) {
+      const t = (n.textContent || "").replace(/\s+/g, " ").trim();
+      const m = RE.exec(t);
+      if (m) return m[0];
     }
-    const m = RE.exec(document.body.innerText || ""); return m ? m[0] : "";
+    return "";
   }
 
-function getRoomLabel(cell, x, y) {
-  // 1️⃣ Reihe der Zelle holen
-  const row = cell.closest(".chadmo-row") || cell.parentElement;
-  if (!row) return "Raum unbekannt";
-
-  // 2️⃣ Versuche, aus der ersten Spalte der Zeile den Namen zu holen
-  const firstCell =
-    row.querySelector('[id="0"], .left0, .chadmo-cell:first-child');
-  if (firstCell) {
-    const text = (firstCell.textContent || "").trim();
-    if (text && /^[A-Z]{1,2}\.\d+\.\d+/.test(text)) { 
-      // Muster: z. B. AD.0.114 Sitzungsraum 1
-      window.__lastRoomLabel = text;
-      return text;
-    }
-  }
-
-  // 3️⃣ Suche in der Nähe (nach links) nach einem Raum mit typischem Muster
-  for (let dx = 10; dx <= 600; dx += 30) {
-    const el = document.elementFromPoint(Math.max(0, x - dx), y);
-    if (!el) continue;
-    const txt = (el.textContent || "").trim();
-    if (txt && /^[A-Z]{1,2}\.\d+\.\d+/.test(txt)) {
-      window.__lastRoomLabel = txt;
-      return txt;
-    }
-  }
-
-  // 4️⃣ Fallback: letzter bekannter Raumname
-  if (window.__lastRoomLabel) return window.__lastRoomLabel;
-
-  // 5️⃣ Wenn nichts gefunden → Standardtext
-  return "Raum unbekannt";
-}
-
-// 💾 zusätzlich merken, sobald einmal ein echter Raumname erkannt wird
-document.addEventListener("mousemove", e => {
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  if (!el) return;
-  const t = (el.textContent || "").trim();
-  if (t && t.length > 1 && t.length < 100 && !/^\d{1,2}:\d{2}$/.test(t))
-    window.__lastRoomLabel = t;
-}, { passive: true });
-
-  
-  function measureRow(row){
+  function measureRow(row) {
     const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
     if (!cells.length) return null;
-    let startCell = cells.find(c => c.id === "0") || cells.slice().sort((a,b)=>a.getBoundingClientRect().left - b.getBoundingClientRect().left)[0];
+    const startCell = cells.find(c => c.id === "0") || cells[0];
     const left0 = startCell.getBoundingClientRect().left;
-    const widths = cells.slice(0, Math.min(10, cells.length)).map(c => c.getBoundingClientRect().width).filter(w=>w>5).sort((a,b)=>a-b);
-    const width = widths[Math.floor(widths.length/2)] || 60;
-    const maxId = Math.max.apply(null, cells.map(c => parseInt(c.id,10)));
-    const colCount = maxId + 1;
-    return {left0, width, colCount};
+    const width = cells[0].getBoundingClientRect().width;
+    return { left0, width, colCount: cells.length };
   }
-  function timeBoundaries(colCount){
-    const startHour = 8; const len = colCount + 1;
-    return Array.from({length: len}, (_,i) => String(startHour+i).padStart(2,"0")+":00");
+
+  function timeBoundaries(colCount) {
+    const start = 8;
+    return Array.from({ length: colCount + 1 }, (_, i) => `${String(start + i).padStart(2, "0")}:00`);
   }
-function timeFromClick(cell, clientX) {
-  const row = cell.closest(".chadmo-row") || cell.parentElement;
-  const m = measureRow(row);
-  if (!m) return ["", ""];
-  const bounds = timeBoundaries(m.colCount);
-  const minX = m.left0;
-  const maxX = m.left0 + m.width * m.colCount;
-  const clampedX = Math.min(Math.max(clientX, minX), maxX - 1);
-  let idx = Math.floor((clampedX - m.left0) / m.width);
-  if (idx >= m.colCount - 1) idx = m.colCount - 1;
-  const from = bounds[idx];
-  const to = bounds[idx + 1] || "22:00";
-  return [from, to];
-}
-  function near216Grey(c){ const m = c && c.match(/\d+/g); if(!m) return false;
-    const [r,g,b] = m.map(Number), tol = 14;
-    return Math.abs(r-216)<=tol && Math.abs(g-217)<=tol && Math.abs(b-218)<=tol; }
-  function isBookedCell(el){
-    if(!el || el.nodeType !== 1) return false;
-    if(el.classList.contains("chadmo-cell") && el.classList.contains("month-cell") && el.classList.contains("last-merge-overlay-cell")) return true;
-    if(el.classList.contains("chadmo-cell")){
+
+  function timeFromClick(cell, clientX) {
+    const row = cell.closest(".chadmo-row");
+    const m = measureRow(row);
+    if (!m) return ["", ""];
+    const bounds = timeBoundaries(m.colCount);
+    const minX = m.left0, maxX = m.left0 + m.width * m.colCount;
+    const clamped = Math.min(Math.max(clientX, minX), maxX - 1);
+    let idx = Math.floor((clamped - m.left0) / m.width);
+    if (idx >= m.colCount - 1) idx = m.colCount - 1;
+    const from = bounds[idx], to = bounds[idx + 1] || "22:00";
+    return [from, to];
+  }
+
+  function near216Grey(c) {
+    const m = c?.match(/\d+/g);
+    if (!m) return false;
+    const [r, g, b] = m.map(Number);
+    return Math.abs(r - 216) < 15 && Math.abs(g - 217) < 15 && Math.abs(b - 218) < 15;
+  }
+
+  function isBookedCell(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.classList.contains("chadmo-cell")) {
       const cs = getComputedStyle(el);
-      if(near216Grey(cs.backgroundColor) || /\brgb\(\s*216\s*,\s*217\s*,\s*218\s*\)/.test(el.getAttribute("style")||"")) return true;
+      if (near216Grey(cs.backgroundColor)) return true;
     }
     return false;
   }
-  function bookedCellFromTarget(t){
-    let n = t; for (let i=0; i<6 && n; i++){ if(isBookedCell(n)) return n; n = n.parentElement; } return null;
+
+  function bookedCellFromTarget(t) {
+    let n = t;
+    for (let i = 0; i < 6 && n; i++) {
+      if (isBookedCell(n)) return n;
+      n = n.parentElement;
+    }
+    return null;
   }
 
-  let backdrop, pop;
-  function ensurePopover(){
-    if(!backdrop){ backdrop=document.createElement("div"); backdrop.id=POPOVER_ID+"-backdrop";
-      backdrop.addEventListener("click", closePopover, {passive:true}); document.body.appendChild(backdrop); }
-    if(!pop){ pop=document.createElement("div"); pop.id=POPOVER_ID;
+  let pop, backdrop;
+
+  function ensurePopover() {
+    if (!backdrop) {
+      backdrop = document.createElement("div");
+      backdrop.id = POPOVER_ID + "-backdrop";
+      backdrop.addEventListener("click", closePopover, { passive: true });
+      document.body.appendChild(backdrop);
+    }
+    if (!pop) {
+      pop = document.createElement("div");
+      pop.id = POPOVER_ID;
       pop.innerHTML = `
         <div class="card">
           <div class="header"><div class="dot">!</div><div class="title">Nicht verfügbar</div></div>
-          <div class="body">
-            <div class="line"><div class="label">Raum</div><div class="value room"></div></div>
-            <div class="line"><div class="label">Zeit</div><div class="value time"></div></div>
-            <div class="line"><div class="label">Datum</div><div class="value date muted"></div></div>
-            <div class="line muted" style="margin-top:10px">Dieser Raum ist im gewählten Zeitfenster bereits belegt.</div>
-          </div>
+          <div class="body"></div>
           <div class="footer">
             <button class="closeBtn">Schließen</button>
             <button class="primary okBtn">Ok</button>
@@ -285,96 +256,77 @@ function timeFromClick(cell, clientX) {
       document.body.appendChild(pop);
       pop.querySelector(".closeBtn").onclick = closePopover;
       pop.querySelector(".okBtn").onclick = closePopover;
-      window.addEventListener("keydown", e => { if (e.key === "Escape") closePopover(); });
+      window.addEventListener("keydown", e => e.key === "Escape" && closePopover());
     }
   }
-  function openPopover({x,y,room,from,to}){
-    ensureStyle(); ensurePopover();
-pop.querySelector(".time").textContent = (from && to) ? `${from} – ${to}` : "–";
-pop.querySelector(".date").textContent = dateLabel();
-const roomLine = pop.querySelector(".line .room")?.closest(".line");
-if (roomLine) roomLine.remove();
 
+  function openPopover({ x, y, from, to, weekView = false, day = "" }) {
+    ensureStyle();
+    ensurePopover();
 
-    pop.style.visibility="hidden";
+    if (weekView) {
+      pop.querySelector(".body").innerHTML = `
+        <div class="line"><div class="label">Tag</div><div class="value">${day}</div></div>
+        <div class="line"><div class="label">Datum</div><div class="value date muted">${dateLabel()}</div></div>
+        <div class="line muted" style="margin-top:10px">
+          Dieser Raum ist an diesem Tag teilweise oder vollständig belegt.
+        </div>`;
+    } else {
+      pop.querySelector(".body").innerHTML = `
+        <div class="line"><div class="label">Zeit</div><div class="value">${from && to ? `${from} – ${to}` : "–"}</div></div>
+        <div class="line"><div class="label">Datum</div><div class="value date muted">${dateLabel()}</div></div>
+        <div class="line muted" style="margin-top:10px">
+          Dieser Raum ist im gewählten Zeitfenster bereits belegt.
+        </div>`;
+    }
+
+    pop.style.visibility = "hidden";
     pop.classList.add("is-open");
-    document.getElementById(POPOVER_ID+"-backdrop").classList.add("is-open");
+    backdrop.classList.add("is-open");
     requestAnimationFrame(() => {
       const card = pop.querySelector(".card");
       const r = card.getBoundingClientRect();
       let left = x + 14, top = y + 14, m = 8;
-      if (left + r.width + m > innerWidth)  left = Math.max(m, innerWidth - r.width - m);
-      if (top  + r.height + m > innerHeight) top = Math.max(m, y - r.height - 16);
-      pop.style.left = left + "px"; pop.style.top = top + "px";
-      pop.style.setProperty("--ox", (x-left) + "px"); pop.style.setProperty("--oy", (y-top) + "px");
+      if (left + r.width + m > innerWidth) left = Math.max(m, innerWidth - r.width - m);
+      if (top + r.height + m > innerHeight) top = Math.max(m, y - r.height - 16);
+      pop.style.left = left + "px";
+      pop.style.top = top + "px";
+      pop.style.setProperty("--ox", (x - left) + "px");
+      pop.style.setProperty("--oy", (y - top) + "px");
       const a = pop.querySelector(".arrow"), s = 14;
-      a.style.left = (x-left-s/2) + "px"; a.style.top = (y >= top ? -s/2 : r.height - s/2) + "px";
-      pop.style.visibility="visible";
+      a.style.left = (x - left - s / 2) + "px";
+      a.style.top = (y >= top ? -s / 2 : r.height - s / 2) + "px";
+      pop.style.visibility = "visible";
     });
   }
-  function closePopover(){
-    const bd = document.getElementById(POPOVER_ID+"-backdrop");
-    if (pop) pop.classList.remove("is-open");
-    if (bd)  bd.classList.remove("is-open");
+
+  function closePopover() {
+    pop?.classList.remove("is-open");
+    backdrop?.classList.remove("is-open");
   }
 
-  ensureStyle();
-document.addEventListener("click", ev => {
-  const el = document.elementFromPoint(ev.clientX, ev.clientY);
-  const cell = bookedCellFromTarget(ev.target) || el;
-  if (!cell) return;
+  // --- Klick-Handler ---
+  document.addEventListener("click", ev => {
+    const el = document.elementFromPoint(ev.clientX, ev.clientY);
+    const cell = bookedCellFromTarget(ev.target) || el;
+    if (!cell) return;
 
-  // Prüfen, ob Wochenansicht aktiv ist
-  const isWeekView = !!document.querySelector('.chadmo-gridsView .header-column:nth-of-type(3) .mergedHeaderContent')
-                     && document.querySelector('.chadmo-gridsView .header-column .mergedHeaderContent')?.textContent?.match(/\bMO\b|Montag/i);
+    const isWeekView = document.querySelector(".chadmo-gridsView .header-column:nth-of-type(3) .mergedHeaderContent")?.textContent?.match(/\bMO\b|Montag/i);
+    if (isWeekView) {
+      if (!isBookedCell(cell)) return;
+      const dayIdx = Array.from(cell.parentElement.children).indexOf(cell);
+      const dayName = document.querySelectorAll(".header-column .mergedHeaderContent")[dayIdx]?.textContent?.trim() || "diesem Tag";
+      openPopover({ x: ev.clientX, y: ev.clientY, weekView: true, day: dayName });
+      return;
+    }
 
-  if (isWeekView) {
+    // Tagesansicht
+    const [from, to] = timeFromClick(cell, ev.clientX);
     if (!isBookedCell(cell)) return;
-    const row = cell.closest(".chadmo-row");
-    const firstCell = row?.querySelector('.chadmo-cell:first-child');
-    const room = (firstCell?.textContent || "").trim() || "Raum unbekannt";
-    const dayIdx = Array.from(row?.querySelectorAll('.chadmo-cell')).indexOf(cell);
-    const dayName = document.querySelectorAll('.header-column .mergedHeaderContent')[dayIdx]?.textContent?.trim() || "diesem Tag";
-    openPopover({
-      x: ev.clientX,
-      y: ev.clientY,
-      room,
-      from: "",
-      to: "",
-      weekView: true,
-      day: dayName
-    });
-    return;
-  }
+    openPopover({ x: ev.clientX, y: ev.clientY, from, to });
+  }, true);
 
-  // Tagesansicht (mit Uhrzeiten)
-  const [from,to] = timeFromClick(cell, ev.clientX);
-  const hour = parseInt((from || "").slice(0,2), 10);
-  if (!isBookedCell(cell) && (isNaN(hour) || hour < 21)) return;
-
-  const room = getRoomLabel(cell, ev.clientX, ev.clientY);
-  openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
-}, true);
-function openPopover({x,y,room,from,to,weekView=false,day=""}) {
-  ensureStyle(); ensurePopover();
-
-  if (weekView) {
-    pop.querySelector(".body").innerHTML = `
-      <div class="line"><div class="label">Tag</div><div class="value">${day}</div></div>
-      <div class="line"><div class="label">Datum</div><div class="value date muted">${dateLabel()}</div></div>
-      <div class="line muted" style="margin-top:10px">
-        Der Raum <b>${room}</b> ist an diesem Tag teilweise oder vollständig belegt.
-      </div>`;
-  } else {
-    pop.querySelector(".body").innerHTML = `
-      <div class="line"><div class="label">Zeit</div><div class="value">${(from&&to)? `${from} – ${to}` : "–"}</div></div>
-      <div class="line"><div class="label">Datum</div><div class="value date muted">${dateLabel()}</div></div>
-      <div class="line muted" style="margin-top:10px">
-        Dieser Raum ist im gewählten Zeitfenster bereits belegt.
-      </div>`;
-  }
-
-})(); // IIFE 2
+})();
 
 /* ============================================================================
    WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.2
