@@ -4,6 +4,12 @@
   const STYLE_ID = "wu-inline-css";
 
   const CSS = `
+  /* Pflichtfeld-Sternchen rot einfärben */
+.mat-mdc-form-field-required-marker {
+  color: #d32f2f !important; /* kräftiges Rot */
+  font-weight: 700 !important;
+}
+
   /* Einheitliche Schriftgrößen & vertikale Ausrichtung für alle Eingabefelder oben */
 .mat-mdc-form-field-infix input,
 .mat-mdc-select-value-text,
