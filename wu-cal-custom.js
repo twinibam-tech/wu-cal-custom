@@ -156,70 +156,40 @@
 
 
 /* ============================================================================
-   WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar" (ohne Raumname)
+   WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar" (ohne Raumzeile)
    ============================================================================ */
 (function () {
   const STYLE_ID = "wu-unavail-v7-style";
   const POPOVER_ID = "wu-unavail-popover";
 
   const CSS = `
-#${POPOVER_ID}-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(10,14,19,.25);
-  backdrop-filter: blur(3px);
-  opacity: 0; pointer-events: none;
-  transition: opacity .18s ease;
-  z-index: 999998;
-}
-#${POPOVER_ID}-backdrop.is-open { opacity: 1; pointer-events: auto; }
-
-#${POPOVER_ID} {
-  position: fixed;
-  min-width: 300px;
-  max-width: min(90vw, 480px);
-  color: #0b1a11;
-  z-index: 999999;
-  transform: scale(.96) translateY(-2px);
-  opacity: 0; pointer-events: none;
-  transition: transform .18s cubic-bezier(.2,.7,.2,1), opacity .18s ease;
-}
-#${POPOVER_ID}.is-open { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
-
-#${POPOVER_ID} .card {
-  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.85));
-  border: 1px solid rgba(26,54,35,.12);
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.18);
-  overflow: hidden;
-}
-#${POPOVER_ID} .header {
-  display: flex; gap: 10px; align-items: center;
-  padding: 14px 16px 6px;
-}
-#${POPOVER_ID} .dot {
-  width: 22px; height: 22px; border-radius: 50%;
-  background: conic-gradient(from 180deg, #e53935, #ef5350);
-  display: grid; place-items: center;
-  color: #fff; font-weight: 800;
-}
-#${POPOVER_ID} .title { font: 600 16px/1.2 system-ui, sans-serif; }
-#${POPOVER_ID} .body { padding: 6px 16px 14px; font: 14px/1.5 system-ui, sans-serif; }
-#${POPOVER_ID} .line { display: flex; gap: 8px; align-items: flex-start; margin-top: 6px; }
-#${POPOVER_ID} .label { min-width: 70px; color: #33543f; font-weight: 600; }
-#${POPOVER_ID} .muted { color: #33543fa8; }
-#${POPOVER_ID} .footer { display: flex; justify-content: flex-end; gap: 10px; padding: 10px 12px 12px; background: rgba(27,94,32,.06); }
-#${POPOVER_ID} button {
-  border: 1px solid rgba(27,94,32,.24);
-  background: #fff;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font: 600 13px/1 system-ui;
-  cursor: pointer;
-}
-#${POPOVER_ID} button.primary { background: #1b5e20; color: #fff; border-color: #1b5e20; }
+#${POPOVER_ID}-backdrop{ position:fixed; inset:0; background:rgba(10,14,19,.25);
+  -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
+  opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:999998; }
+#${POPOVER_ID}-backdrop.is-open{ opacity:1; pointer-events:auto; }
+#${POPOVER_ID}{ position:fixed; min-width:320px; max-width:min(92vw,520px);
+  color:#0b1a11; z-index:999999; transform-origin:var(--ox,center) var(--oy,center);
+  transform:scale(.96) translateY(-2px); opacity:0; pointer-events:none;
+  transition:transform .18s cubic-bezier(.2,.7,.2,1), opacity .18s ease; }
+#${POPOVER_ID}.is-open{ opacity:1; transform:scale(1) translateY(0); pointer-events:auto; }
+#${POPOVER_ID} .card{ background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.82));
+  border:1px solid rgba(26,54,35,.12); border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.18); overflow:hidden; }
+#${POPOVER_ID} .header{ display:flex; gap:10px; align-items:center; padding:14px 16px 6px; }
+#${POPOVER_ID} .dot{ width:22px; height:22px; border-radius:50%; background:conic-gradient(from 180deg,#e53935,#ef5350);
+  box-shadow:0 0 0 3px #fff inset, 0 0 0 1px rgba(0,0,0,.06); display:inline-grid; place-items:center; color:#fff; font-weight:800; }
+#${POPOVER_ID} .title{ font:600 16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+#${POPOVER_ID} .body{ padding:6px 16px 14px; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+#${POPOVER_ID} .line{ display:flex; gap:8px; align-items:flex-start; margin-top:6px; }
+#${POPOVER_ID} .label{ min-width:74px; color:#33543f; font-weight:600; }
+#${POPOVER_ID} .value{ flex:1 1 auto; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#${POPOVER_ID} .muted{ color:#33543fa8; }
+#${POPOVER_ID} .footer{ display:flex; justify-content:flex-end; gap:10px; padding:10px 12px 12px; background:rgba(27,94,32,.06); }
+#${POPOVER_ID} button{ appearance:none; border:1px solid rgba(27,94,32,.24); background:#fff;
+  padding:8px 12px; border-radius:8px; font:600 13px/1 system-ui; cursor:pointer; }
+#${POPOVER_ID} button.primary{ background:#1b5e20; color:#fff; border-color:#1b5e20; }
+#${POPOVER_ID} .arrow{ position:absolute; width:14px; height:14px; transform:rotate(45deg); background:inherit; border:inherit; }
 `;
 
-  // ----- Hilfsfunktionen -----
   function ensureStyle(){
     if (!document.getElementById(STYLE_ID)) {
       const s = document.createElement("style");
@@ -239,26 +209,22 @@
     return "";
   }
 
-  function isGrey(el){
-    if (!el) return false;
-    const cs = getComputedStyle(el);
-    const rgb = cs.backgroundColor.match(/\d+/g);
-    if (!rgb) return false;
-    const [r,g,b] = rgb.map(Number);
-    return Math.abs(r-216)<8 && Math.abs(g-217)<8 && Math.abs(b-218)<8;
-  }
-
-  function findBookedCell(target){
-    let n = target;
-    for (let i=0;i<5 && n;i++){
-      if (n.classList?.contains("chadmo-cell") && isGrey(n)) return n;
-      n = n.parentElement;
+  function near216Grey(c){ const m = c && c.match(/\d+/g); if(!m) return false;
+    const [r,g,b] = m.map(Number), tol = 14;
+    return Math.abs(r-216)<=tol && Math.abs(g-217)<=tol && Math.abs(b-218)<=tol; }
+  function isBookedCell(el){
+    if(!el || el.nodeType !== 1) return false;
+    if(el.classList.contains("chadmo-cell")){
+      const cs = getComputedStyle(el);
+      if(near216Grey(cs.backgroundColor)) return true;
     }
-    return null;
+    return false;
+  }
+  function bookedCellFromTarget(t){
+    let n = t; for (let i=0; i<6 && n; i++){ if(isBookedCell(n)) return n; n = n.parentElement; } return null;
   }
 
-  // ----- Popover -----
-  let pop, backdrop;
+  let backdrop, pop;
   function ensurePopover(){
     if(!backdrop){
       backdrop=document.createElement("div");
@@ -269,55 +235,61 @@
     if(!pop){
       pop=document.createElement("div");
       pop.id=POPOVER_ID;
-      pop.innerHTML=`
+      pop.innerHTML = `
         <div class="card">
           <div class="header"><div class="dot">!</div><div class="title">Nicht verfügbar</div></div>
           <div class="body">
             <div class="line"><div class="label">Zeit</div><div class="value time"></div></div>
             <div class="line"><div class="label">Datum</div><div class="value date muted"></div></div>
-            <div class="line muted" style="margin-top:10px">Der ausgewählte Zeitraum ist bereits belegt.</div>
           </div>
-          <div class="footer"><button class="primary okBtn">Ok</button></div>
-        </div>`;
+          <div class="footer">
+            <button class="primary okBtn">Ok</button>
+          </div>
+        </div>
+        <div class="arrow"></div>`;
       document.body.appendChild(pop);
-      pop.querySelector(".okBtn").onclick=closePopover;
+      pop.querySelector(".okBtn").onclick = closePopover;
+      window.addEventListener("keydown", e => { if (e.key === "Escape") closePopover(); });
     }
   }
 
   function openPopover({x,y,from,to}){
     ensureStyle(); ensurePopover();
-    pop.querySelector(".time").textContent=`${from} – ${to}`;
-    pop.querySelector(".date").textContent=dateLabel();
+    pop.querySelector(".time").textContent = (from&&to)? `${from} – ${to}` : "–";
+    pop.querySelector(".date").textContent = dateLabel();
 
+    pop.style.visibility="hidden";
     pop.classList.add("is-open");
     document.getElementById(POPOVER_ID+"-backdrop").classList.add("is-open");
-    const r=pop.querySelector(".card").getBoundingClientRect();
-    let left=x+14, top=y+14;
-    if(left+r.width>innerWidth) left=innerWidth-r.width-10;
-    if(top+r.height>innerHeight) top=y-r.height-14;
-    pop.style.left=left+"px";
-    pop.style.top=top+"px";
+    requestAnimationFrame(() => {
+      const card = pop.querySelector(".card");
+      const r = card.getBoundingClientRect();
+      let left = x + 14, top = y + 14, m = 8;
+      if (left + r.width + m > innerWidth)  left = Math.max(m, innerWidth - r.width - m);
+      if (top  + r.height + m > innerHeight) top = Math.max(m, y - r.height - 16);
+      pop.style.left = left + "px";
+      pop.style.top = top + "px";
+      pop.style.visibility="visible";
+    });
   }
 
   function closePopover(){
-    pop?.classList.remove("is-open");
-    backdrop?.classList.remove("is-open");
+    const bd = document.getElementById(POPOVER_ID+"-backdrop");
+    if (pop) pop.classList.remove("is-open");
+    if (bd)  bd.classList.remove("is-open");
   }
 
-  // ----- Klick-Listener -----
   ensureStyle();
-  document.addEventListener("click", e=>{
-    const booked=findBookedCell(e.target);
-    if(!booked) return;
+  document.addEventListener("click", ev => {
+    const cell = bookedCellFromTarget(ev.target);
+    if (!cell) return;
 
-    // Zeit aus Spaltenindex schätzen (8:00 Start)
-    const id=booked.id?parseInt(booked.id,10):0;
-    const start=8+id;
-    const from=`${String(start).padStart(2,"0")}:00`;
-    const to=`${String(start+1).padStart(2,"0")}:00`;
-    openPopover({x:e.clientX,y:e.clientY,from,to});
-  },true);
-})();
+    const idx = parseInt(cell.id || "0", 10);
+    const from = `${String(8+idx).padStart(2,"0")}:00`;
+    const to = `${String(9+idx).padStart(2,"0")}:00`;
+    openPopover({x:ev.clientX, y:ev.clientY, from, to});
+  }, true);
+})(); // IIFE 2
 
 /* ============================================================================
    WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.2
