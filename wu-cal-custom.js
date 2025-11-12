@@ -157,7 +157,7 @@
 
 /* ============================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
-   V7.1: Raum-Zeile entfernt
+   V7.2: Fix für rechte Rand-Spalte (z. B. 21:00) + Raum-Zeile entfernt
    ============================================================================ */
 (function () {
   const STYLE_ID = "wu-unavail-v7-style";
@@ -210,23 +210,6 @@
     const m = RE.exec(document.body.innerText || ""); return m ? m[0] : "";
   }
 
-  function getRoomLabel(cell, x, y){
-    const row = cell.closest(".chadmo-row") || cell.parentElement;
-    if (row){
-      const leftCell = row.querySelector('div[id="0"]') || row.querySelector('.left0') || row.firstElementChild;
-      if (leftCell){
-        const t = (leftCell.textContent || "").replace(/\s+/g," ").trim(); if (t) return t;
-      }
-    }
-    for (const dx of [60,100,160,220,300,380]){
-      const el = document.elementFromPoint(Math.max(0, x - dx), y);
-      if (row && el && el.closest(".chadmo-row") !== row) continue;
-      const t = (el && el.textContent || "").replace(/\s+/g," ").trim();
-      if (t && t.length < 80) return t;
-    }
-    return "Dieser Raum";
-  }
-
   function measureRow(row){
     const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
     if (!cells.length) return null;
@@ -238,19 +221,22 @@
     const colCount = maxId + 1;
     return {left0, width, colCount};
   }
-function timeBoundaries(colCount){
-  const startHour = 8;
-  const len = colCount + 2; // +2 statt +1, damit die rechte Kante (z.B. 21:00–22:00) auch zählt
-  return Array.from({length: len}, (_,i) => String(startHour+i).padStart(2,"0")+":00");
-}
+
+  function timeBoundaries(colCount){
+    const startHour = 8;
+    const len = colCount + 2; // extra slot for right edge
+    return Array.from({length: len}, (_,i) => String(startHour+i).padStart(2,"0")+":00");
+  }
+
   function timeFromClick(cell, clientX){
     const row = cell.closest(".chadmo-row") || cell.parentElement;
     const m = measureRow(row); if (!m) return ["",""];
     const bounds = timeBoundaries(m.colCount);
-    const minX = m.left0, maxX = m.left0 + m.width * m.colCount - 0.001;
+    const minX = m.left0;
+    const maxX = m.left0 + m.width * (m.colCount + 0.5); // extend detection zone
     const clampedX = Math.min(Math.max(clientX, minX), maxX);
     let idx = Math.floor((clampedX - m.left0) / m.width);
-    idx = Math.max(0, Math.min(idx, m.colCount - 1));
+    idx = Math.max(0, Math.min(idx, bounds.length - 2));
     return [bounds[idx], bounds[idx+1]];
   }
 
@@ -295,7 +281,8 @@ function timeBoundaries(colCount){
       window.addEventListener("keydown", e => { if (e.key === "Escape") closePopover(); });
     }
   }
-  function openPopover({x,y,room,from,to}){
+
+  function openPopover({x,y,from,to}){
     ensureStyle(); ensurePopover();
     pop.querySelector(".time").textContent = (from&&to)? `${from} – ${to}` : "–";
     pop.querySelector(".date").textContent = dateLabel();
@@ -316,6 +303,7 @@ function timeBoundaries(colCount){
       pop.style.visibility="visible";
     });
   }
+
   function closePopover(){
     const bd = document.getElementById(POPOVER_ID+"-backdrop");
     if (pop) pop.classList.remove("is-open");
@@ -327,10 +315,9 @@ function timeBoundaries(colCount){
     const cell = bookedCellFromTarget(ev.target) || document.elementFromPoint(ev.clientX, ev.clientY);
     if (!cell || !isBookedCell(cell)) return;
     const [from,to] = timeFromClick(cell, ev.clientX);
-    const room = getRoomLabel(cell, ev.clientX, ev.clientY);
-    openPopover({x:ev.clientX, y:ev.clientY, room, from, to});
+    openPopover({x:ev.clientX, y:ev.clientY, from, to});
   }, true);
-})(); // IIFE 2
+})();
 
 /* ============================================================================
    WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.2
