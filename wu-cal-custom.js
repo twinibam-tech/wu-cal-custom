@@ -157,7 +157,7 @@
 
 /* ============================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
-   V7: exakte Zeit inkl. rechter Rand (21–22), robustes X-Clamping
+   V7.1: Raum-Zeile entfernt
    ============================================================================ */
 (function () {
   const STYLE_ID = "wu-unavail-v7-style";
@@ -278,7 +278,6 @@
         <div class="card">
           <div class="header"><div class="dot">!</div><div class="title">Nicht verfügbar</div></div>
           <div class="body">
-            <div class="line"><div class="label">Raum</div><div class="value room"></div></div>
             <div class="line"><div class="label">Zeit</div><div class="value time"></div></div>
             <div class="line"><div class="label">Datum</div><div class="value date muted"></div></div>
             <div class="line muted" style="margin-top:10px">Dieser Raum ist im gewählten Zeitfenster bereits belegt.</div>
@@ -297,7 +296,6 @@
   }
   function openPopover({x,y,room,from,to}){
     ensureStyle(); ensurePopover();
-    pop.querySelector(".room").textContent = room;
     pop.querySelector(".time").textContent = (from&&to)? `${from} – ${to}` : "–";
     pop.querySelector(".date").textContent = dateLabel();
 
