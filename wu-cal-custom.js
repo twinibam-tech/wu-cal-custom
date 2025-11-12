@@ -238,10 +238,11 @@
     const colCount = maxId + 1;
     return {left0, width, colCount};
   }
-  function timeBoundaries(colCount){
-    const startHour = 8; const len = colCount + 1;
-    return Array.from({length: len}, (_,i) => String(startHour+i).padStart(2,"0")+":00");
-  }
+function timeBoundaries(colCount){
+  const startHour = 8;
+  const len = colCount + 2; // +2 statt +1, damit die rechte Kante (z.B. 21:00–22:00) auch zählt
+  return Array.from({length: len}, (_,i) => String(startHour+i).padStart(2,"0")+":00");
+}
   function timeFromClick(cell, clientX){
     const row = cell.closest(".chadmo-row") || cell.parentElement;
     const m = measureRow(row); if (!m) return ["",""];
