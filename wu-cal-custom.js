@@ -278,6 +278,7 @@
         <div class="card">
           <div class="header"><div class="dot">!</div><div class="title">Nicht verfügbar</div></div>
           <div class="body">
+            <div class="line"><div class="label">Raum</div><div class="value room"></div></div>
             <div class="line"><div class="label">Zeit</div><div class="value time"></div></div>
             <div class="line"><div class="label">Datum</div><div class="value date muted"></div></div>
             <div class="line muted" style="margin-top:10px">Dieser Raum ist im gewählten Zeitfenster bereits belegt.</div>
