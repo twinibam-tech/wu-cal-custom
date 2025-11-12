@@ -210,6 +210,23 @@
     const m = RE.exec(document.body.innerText || ""); return m ? m[0] : "";
   }
 
+  function getRoomLabel(cell, x, y){
+    const row = cell.closest(".chadmo-row") || cell.parentElement;
+    if (row){
+      const leftCell = row.querySelector('div[id="0"]') || row.querySelector('.left0') || row.firstElementChild;
+      if (leftCell){
+        const t = (leftCell.textContent || "").replace(/\s+/g," ").trim(); if (t) return t;
+      }
+    }
+    for (const dx of [60,100,160,220,300,380]){
+      const el = document.elementFromPoint(Math.max(0, x - dx), y);
+      if (row && el && el.closest(".chadmo-row") !== row) continue;
+      const t = (el && el.textContent || "").replace(/\s+/g," ").trim();
+      if (t && t.length < 80) return t;
+    }
+    return "Dieser Raum";
+  }
+
   function measureRow(row){
     const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
     if (!cells.length) return null;
