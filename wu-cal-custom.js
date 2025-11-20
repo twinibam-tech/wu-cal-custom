@@ -952,72 +952,79 @@
 })();
 
 /* ============================================================================
-   WU – Drag-to-Select im Kalender: Zeitraum + Raum auswählen -> Formular füllen
+   WU – Drag-to-Select im Kalender: Zeitraum + Raum auswählen -> Formular füllen (FIXED v2)
    ============================================================================ */
 (function () {
   let isDragging = false;
   let startCell = null;
+  let endCell = null;
   let startTime = null;
   let endTime = null;
   let roomName = null;
   let selectedCells = [];
 
   // Hilfsfunktionen
-  function parseTime(str) {
-    const match = str?.match(/(\d{1,2}):(\d{2})/);
-    return match ? { h: parseInt(match[1], 10), m: parseInt(match[2], 10) } : null;
-  }
-
   function formatTime(h, m) {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
 
-  function getColumnTime(cell) {
-    const row = cell.closest('.chadmo-row');
-    if (!row) return null;
+  function getColumnIndex(cell) {
+    const row = cell.closest('[class*="row"]');
+    if (!row) return -1;
     
-    const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
-    const index = cells.indexOf(cell);
-    if (index === -1) return null;
+    // Finde alle Zeit-Zellen in dieser Reihe
+    const allCells = Array.from(row.querySelectorAll('div')).filter(el => {
+      const text = el.textContent?.trim();
+      return el.getAttribute('style')?.includes('background') || el.classList.contains('chadmo-cell');
+    });
     
-    return formatTime(8 + index, 0); // Start bei 08:00
+    return allCells.indexOf(cell);
   }
 
-  function getRoomName(cell) {
-    const row = cell.closest('.chadmo-row');
-    if (!row) return null;
-    
-    const roomCell = row.querySelector('.chadmo-rowName, [class*="room-name"]');
-    return roomCell ? roomCell.textContent.trim() : null;
+  function getTimeFromIndex(index) {
+    // Startzeit 08:00, jede Spalte = 1 Stunde
+    const hour = 8 + index;
+    if (hour >= 24) return null;
+    return formatTime(hour, 0);
+  }
+
+  function getRoomNameFromRow(row) {
+    const roomCell = row.querySelector('[class*="rowName"], td:first-child, div:first-child');
+    if (!roomCell) return null;
+    const text = roomCell.textContent?.trim();
+    return text && text.length > 0 ? text : null;
   }
 
   function extractBuilding(roomName) {
     if (!roomName) return null;
-    const match = roomName.match(/^([A-Z]+[\d\.]*)/);
+    // Extrahiert z.B. "AD" aus "AD.0.089 Sitzungssaal 3"
+    const match = roomName.match(/^([A-Z]{1,3})/);
     return match ? match[1] : null;
   }
 
   function isAvailableCell(cell) {
-    if (!cell || !cell.classList.contains('chadmo-cell')) return false;
-    const cs = getComputedStyle(cell);
-    const bg = cs.backgroundColor;
-    // Graue Zellen (belegt) ausschließen
-    const near216Grey = (c) => {
-      const m = c && c.match(/\d+/g);
-      if (!m) return false;
-      const [r, g, b] = m.map(Number);
-      const tol = 14;
-      return Math.abs(r - 216) <= tol && Math.abs(g - 217) <= tol && Math.abs(b - 218) <= tol;
-    };
-    return !near216Grey(bg);
+    if (!cell) return false;
+    const style = cell.getAttribute('style') || '';
+    const bgColor = window.getComputedStyle(cell).backgroundColor;
+    
+    // Graue Zellen (RGB ~216,217,218) = belegt
+    const isGrey = bgColor.includes('rgb(216') || 
+                   bgColor.includes('rgb(217') || 
+                   bgColor.includes('rgb(218') ||
+                   style.includes('rgb(216') ||
+                   style.includes('rgb(217') ||
+                   style.includes('rgb(218');
+    
+    return !isGrey && cell.offsetHeight > 0;
   }
 
   function highlightCells(cells) {
     cells.forEach(c => {
       if (c && !c.__origBg) {
         c.__origBg = c.style.backgroundColor;
-        c.style.backgroundColor = 'rgba(15, 110, 133, 0.3)';
+        c.style.backgroundColor = 'rgba(15, 110, 133, 0.4)';
         c.style.border = '2px solid #0f6e85';
+        c.style.boxShadow = 'inset 0 0 4px rgba(15, 110, 133, 0.5)';
       }
     });
   }
@@ -1027,6 +1034,7 @@
       if (c && c.__origBg !== undefined) {
         c.style.backgroundColor = c.__origBg;
         c.style.border = '';
+        c.style.boxShadow = '';
         delete c.__origBg;
       }
     });
@@ -1035,25 +1043,29 @@
 
   function getCellsBetween(start, end) {
     if (!start || !end) return [];
-    const row = start.closest('.chadmo-row');
+    const row = start.closest('[class*="row"]');
     if (!row) return [];
     
-    const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
-    const startIdx = cells.indexOf(start);
-    const endIdx = cells.indexOf(end);
+    // Finde alle Zellen in der Reihe
+    const allCells = Array.from(row.querySelectorAll('div')).filter(el => {
+      return el.offsetHeight > 0 && 
+             (el.getAttribute('style')?.includes('background') || el.classList.contains('chadmo-cell'));
+    });
+    
+    const startIdx = allCells.indexOf(start);
+    const endIdx = allCells.indexOf(end);
     
     if (startIdx === -1 || endIdx === -1) return [];
     
     const from = Math.min(startIdx, endIdx);
     const to = Math.max(startIdx, endIdx);
     
-    return cells.slice(from, to + 1).filter(isAvailableCell);
+    return allCells.slice(from, to + 1).filter(isAvailableCell);
   }
 
-  function showParticipantPopup(data) {
+  async function showParticipantPopup(data) {
     const POPUP_ID = 'wu-participant-popup';
     
-    // Existierendes Popup entfernen
     const existing = document.getElementById(POPUP_ID);
     if (existing) existing.remove();
 
@@ -1065,26 +1077,31 @@
       left: 50%;
       transform: translate(-50%, -50%);
       background: white;
-      border: 1px solid #ccc;
+      border: 2px solid #0f6e85;
       border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      padding: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      padding: 24px;
       z-index: 10000;
-      min-width: 300px;
+      min-width: 320px;
+      max-width: 400px;
       font-family: system-ui, Arial, sans-serif;
     `;
 
     popup.innerHTML = `
-      <h3 style="margin: 0 0 15px; color: #0f6e85;">Veranstaltung hinzufügen</h3>
-      <div style="margin-bottom: 15px;">
-        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">
+      <h3 style="margin: 0 0 12px; color: #0f6e85; font-size: 18px;">Veranstaltung hinzufügen</h3>
+      <p style="margin: 0 0 12px; color: #666; font-size: 14px;">
+        <strong>Raum:</strong> ${data.roomName}<br>
+        <strong>Zeit:</strong> ${data.startTime} – ${data.endTime}
+      </p>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #333; font-size: 14px;">
           Teilnehmerzahl<span style="color: red;">*</span>
         </label>
         <input type="number" id="participant-count" min="1" placeholder="z.B. 30" 
-          style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+          style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
       </div>
       <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button id="cancel-btn" style="padding: 8px 16px; border: 1px solid #ddd; background: white; cursor: pointer; border-radius: 4px;">
+        <button id="cancel-btn" style="padding: 8px 16px; border: 1px solid #ddd; background: white; cursor: pointer; border-radius: 4px; font-weight: 500;">
           Abbrechen
         </button>
         <button id="confirm-btn" style="padding: 8px 16px; background: #0f6e85; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: 600;">
@@ -1094,6 +1111,17 @@
     `;
 
     document.body.appendChild(popup);
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 9999;
+    `;
+    document.body.appendChild(backdrop);
 
     return new Promise((resolve) => {
       const input = document.getElementById('participant-count');
@@ -1104,24 +1132,26 @@
         if (count && count > 0) {
           data.participantCount = count;
           popup.remove();
+          backdrop.remove();
           resolve(data);
         } else {
           alert('Bitte geben Sie eine gültige Teilnehmerzahl ein.');
         }
       };
 
-      document.getElementById('confirm-btn').addEventListener('click', confirm);
-      document.getElementById('cancel-btn').addEventListener('click', () => {
+      const cancel = () => {
         popup.remove();
+        backdrop.remove();
         resolve(null);
-      });
+      };
+
+      document.getElementById('confirm-btn').addEventListener('click', confirm);
+      document.getElementById('cancel-btn').addEventListener('click', cancel);
+      backdrop.addEventListener('click', cancel);
 
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') confirm();
-        if (e.key === 'Escape') {
-          popup.remove();
-          resolve(null);
-        }
+        if (e.key === 'Escape') cancel();
       });
     });
   }
@@ -1129,8 +1159,10 @@
   function fillForm(data) {
     if (!data) return;
 
+    console.log('Filling form with:', data);
+
     // Datum setzen
-    const dateInput = document.querySelector('input[formcontrolname="date"], input[name="date"]');
+    const dateInput = document.querySelector('input[placeholder*="Datum"], input[aria-label*="Datum"], input[name="date"]');
     if (dateInput && data.date) {
       dateInput.value = data.date;
       dateInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1138,119 +1170,126 @@
     }
 
     // Startzeit setzen
-    const startSelect = document.querySelector('mat-select[formcontrolname="startTime"], select[name="startTime"]');
-    if (startSelect && data.startTime) {
-      startSelect.click();
-      setTimeout(() => {
-        const options = document.querySelectorAll('mat-option');
-        const targetOption = Array.from(options).find(opt => 
-          opt.textContent.trim() === data.startTime
-        );
-        if (targetOption) targetOption.click();
-      }, 100);
-    }
+    setTimeout(() => {
+      const startSelects = document.querySelectorAll('[aria-label*="Startzeit"] .mat-mdc-select-trigger, [aria-label*="Startzeit"], .mat-mdc-select');
+      for (let sel of startSelects) {
+        const text = sel.textContent?.trim();
+        if (text && text.includes('Startzeit')) {
+          sel.click();
+          setTimeout(() => {
+            const options = document.querySelectorAll('mat-option');
+            const target = Array.from(options).find(opt => opt.textContent.trim() === data.startTime);
+            if (target) target.click();
+          }, 150);
+          break;
+        }
+      }
+    }, 100);
 
     // Endzeit setzen
-    const endSelect = document.querySelector('mat-select[formcontrolname="endTime"], select[name="endTime"]');
-    if (endSelect && data.endTime) {
-      endSelect.click();
-      setTimeout(() => {
-        const options = document.querySelectorAll('mat-option');
-        const targetOption = Array.from(options).find(opt => 
-          opt.textContent.trim() === data.endTime
-        );
-        if (targetOption) targetOption.click();
-      }, 100);
-    }
+    setTimeout(() => {
+      const endSelects = document.querySelectorAll('[aria-label*="Endzeit"] .mat-mdc-select-trigger, [aria-label*="Endzeit"], .mat-mdc-select');
+      for (let sel of endSelects) {
+        const text = sel.textContent?.trim();
+        if (text && text.includes('Endzeit')) {
+          sel.click();
+          setTimeout(() => {
+            const options = document.querySelectorAll('mat-option');
+            const target = Array.from(options).find(opt => opt.textContent.trim() === data.endTime);
+            if (target) target.click();
+          }, 150);
+          break;
+        }
+      }
+    }, 200);
 
     // Gebäude auswählen
-    if (data.building) {
-      const buildingSelect = document.querySelector('mat-select[formcontrolname="building"], select[name="building"]');
-      if (buildingSelect) {
-        buildingSelect.click();
-        setTimeout(() => {
-          const options = document.querySelectorAll('mat-option');
-          const targetOption = Array.from(options).find(opt => 
-            opt.textContent.trim().includes(data.building)
-          );
-          if (targetOption) targetOption.click();
-        }, 100);
+    setTimeout(() => {
+      if (data.building) {
+        const buildingSelect = document.querySelector('[aria-label*="Gebäude"] .mat-mdc-select-trigger, [aria-label*="Gebäude"]');
+        if (buildingSelect) {
+          buildingSelect.click();
+          setTimeout(() => {
+            const options = document.querySelectorAll('mat-option');
+            const target = Array.from(options).find(opt => opt.textContent.trim().includes(data.building));
+            if (target) target.click();
+          }, 150);
+        }
       }
-    }
-
-    // Raumtyp oder Raum auswählen
-    if (data.roomType) {
-      const roomTypeSelect = document.querySelector('mat-select[formcontrolname="roomType"], select[name="roomType"]');
-      if (roomTypeSelect) {
-        roomTypeSelect.click();
-        setTimeout(() => {
-          const options = document.querySelectorAll('mat-option');
-          const targetOption = Array.from(options).find(opt => 
-            opt.textContent.trim().includes(data.roomType)
-          );
-          if (targetOption) targetOption.click();
-        }, 100);
-      }
-    }
+    }, 300);
 
     // Teilnehmerzahl setzen
-    if (data.participantCount) {
-      const participantInput = document.querySelector('input[formcontrolname="participantCount"], input[name="participantCount"]');
-      if (participantInput) {
-        participantInput.value = data.participantCount;
-        participantInput.dispatchEvent(new Event('input', { bubbles: true }));
-        participantInput.dispatchEvent(new Event('change', { bubbles: true }));
+    setTimeout(() => {
+      const partInput = document.querySelector('input[placeholder*="Teilnehmerzahl"], input[aria-label*="Teilnehmerzahl"]');
+      if (partInput && data.participantCount) {
+        partInput.value = data.participantCount;
+        partInput.dispatchEvent(new Event('input', { bubbles: true }));
+        partInput.dispatchEvent(new Event('change', { bubbles: true }));
       }
-    }
+    }, 100);
   }
 
   // Event-Listener für Kalender-Zellen
-  document.addEventListener('mousedown', (e) => {
-    const cell = e.target.closest('.chadmo-cell');
+  document.addEventListener('pointerdown', (e) => {
+    const cell = e.target.closest('div');
     if (!cell || !isAvailableCell(cell)) return;
+
+    const row = cell.closest('[class*="row"]');
+    if (!row) return;
 
     isDragging = true;
     startCell = cell;
-    startTime = getColumnTime(cell);
-    roomName = getRoomName(cell);
+    startTime = getTimeFromIndex(getColumnIndex(cell));
+    roomName = getRoomNameFromRow(row);
+
+    if (!startTime || !roomName) {
+      isDragging = false;
+      return;
+    }
 
     clearHighlight();
     highlightCells([cell]);
     selectedCells = [cell];
-  });
 
-  document.addEventListener('mousemove', (e) => {
+    e.preventDefault();
+  }, true);
+
+  document.addEventListener('pointermove', (e) => {
     if (!isDragging || !startCell) return;
 
-    const cell = e.target.closest('.chadmo-cell');
+    const cell = e.target.closest('div');
     if (!cell || !isAvailableCell(cell)) return;
 
-    // Nur in der gleichen Reihe (gleicher Raum)
-    if (cell.closest('.chadmo-row') !== startCell.closest('.chadmo-row')) return;
+    const startRow = startCell.closest('[class*="row"]');
+    const currentRow = cell.closest('[class*="row"]');
+    if (startRow !== currentRow) return;
 
     clearHighlight();
     selectedCells = getCellsBetween(startCell, cell);
     highlightCells(selectedCells);
-  });
 
-  document.addEventListener('mouseup', async (e) => {
+    e.preventDefault();
+  }, true);
+
+  document.addEventListener('pointerup', async (e) => {
     if (!isDragging) return;
 
     isDragging = false;
-    const endCell = e.target.closest('.chadmo-cell');
 
-    if (!startCell || !endCell || selectedCells.length === 0) {
+    if (selectedCells.length === 0) {
       clearHighlight();
       return;
     }
 
-    endTime = getColumnTime(selectedCells[selectedCells.length - 1]);
-    roomName = getRoomName(startCell);
+    endCell = selectedCells[selectedCells.length - 1];
+    endTime = getTimeFromIndex(getColumnIndex(endCell));
 
     if (!startTime || !endTime || !roomName) {
       clearHighlight();
       return;
     }
+
+    console.log('Selection complete:', { startTime, endTime, roomName });
 
     // Popup für Teilnehmerzahl anzeigen
     const result = await showParticipantPopup({
@@ -1260,8 +1299,7 @@
     });
 
     if (result) {
-      // Datum vom Header extrahieren
-      const dateLabel = document.querySelector('.usi-calendarHeader, .chadmo-gridsView .header')?.textContent || '';
+      const dateLabel = document.querySelector('[class*="header"]')?.textContent || '';
       const dateMatch = dateLabel.match(/(\d{1,2}\.\d{1,2}\.\d{4})/);
       const date = dateMatch ? dateMatch[1] : '';
 
@@ -1271,12 +1309,13 @@
         date,
         startTime: result.startTime,
         endTime: result.endTime,
-        building: building + ' Gebäude',
-        roomType: roomName,
+        building: building,
         participantCount: result.participantCount
       });
     }
 
     clearHighlight();
-  });
+  }, true);
+
+  console.log('WU Drag-to-Select initialized');
 })();
