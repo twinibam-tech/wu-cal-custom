@@ -82,6 +82,7 @@
 .chadmo-gridsView .header-columns .header-column:nth-of-type(13) .mergedHeaderContent::before{content:"19:00";}
 .chadmo-gridsView .header-columns .header-column:nth-of-type(14) .mergedHeaderContent::before{content:"20:00";}
 .chadmo-gridsView .header-columns .header-column:nth-of-type(15) .mergedHeaderContent::before{content:"21:00";}
+.chadmo-gridsView .header-columns .header-column:nth-of-type(16) .mergedHeaderContent::before{content:"22:00";}
 
   `;
 
@@ -948,4 +949,334 @@
 
   // SPA-Resilienz
   new MutationObserver(linkifyFeatures).observe(document.documentElement, { childList:true, subtree:true });
+})();
+
+/* ============================================================================
+   WU – Drag-to-Select im Kalender: Zeitraum + Raum auswählen -> Formular füllen
+   ============================================================================ */
+(function () {
+  let isDragging = false;
+  let startCell = null;
+  let startTime = null;
+  let endTime = null;
+  let roomName = null;
+  let selectedCells = [];
+
+  // Hilfsfunktionen
+  function parseTime(str) {
+    const match = str?.match(/(\d{1,2}):(\d{2})/);
+    return match ? { h: parseInt(match[1], 10), m: parseInt(match[2], 10) } : null;
+  }
+
+  function formatTime(h, m) {
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  function getColumnTime(cell) {
+    const row = cell.closest('.chadmo-row');
+    if (!row) return null;
+    
+    const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
+    const index = cells.indexOf(cell);
+    if (index === -1) return null;
+    
+    return formatTime(8 + index, 0); // Start bei 08:00
+  }
+
+  function getRoomName(cell) {
+    const row = cell.closest('.chadmo-row');
+    if (!row) return null;
+    
+    const roomCell = row.querySelector('.chadmo-rowName, [class*="room-name"]');
+    return roomCell ? roomCell.textContent.trim() : null;
+  }
+
+  function extractBuilding(roomName) {
+    if (!roomName) return null;
+    const match = roomName.match(/^([A-Z]+[\d\.]*)/);
+    return match ? match[1] : null;
+  }
+
+  function isAvailableCell(cell) {
+    if (!cell || !cell.classList.contains('chadmo-cell')) return false;
+    const cs = getComputedStyle(cell);
+    const bg = cs.backgroundColor;
+    // Graue Zellen (belegt) ausschließen
+    const near216Grey = (c) => {
+      const m = c && c.match(/\d+/g);
+      if (!m) return false;
+      const [r, g, b] = m.map(Number);
+      const tol = 14;
+      return Math.abs(r - 216) <= tol && Math.abs(g - 217) <= tol && Math.abs(b - 218) <= tol;
+    };
+    return !near216Grey(bg);
+  }
+
+  function highlightCells(cells) {
+    cells.forEach(c => {
+      if (c && !c.__origBg) {
+        c.__origBg = c.style.backgroundColor;
+        c.style.backgroundColor = 'rgba(15, 110, 133, 0.3)';
+        c.style.border = '2px solid #0f6e85';
+      }
+    });
+  }
+
+  function clearHighlight() {
+    selectedCells.forEach(c => {
+      if (c && c.__origBg !== undefined) {
+        c.style.backgroundColor = c.__origBg;
+        c.style.border = '';
+        delete c.__origBg;
+      }
+    });
+    selectedCells = [];
+  }
+
+  function getCellsBetween(start, end) {
+    if (!start || !end) return [];
+    const row = start.closest('.chadmo-row');
+    if (!row) return [];
+    
+    const cells = Array.from(row.querySelectorAll('div[id]')).filter(d => /^\d+$/.test(d.id));
+    const startIdx = cells.indexOf(start);
+    const endIdx = cells.indexOf(end);
+    
+    if (startIdx === -1 || endIdx === -1) return [];
+    
+    const from = Math.min(startIdx, endIdx);
+    const to = Math.max(startIdx, endIdx);
+    
+    return cells.slice(from, to + 1).filter(isAvailableCell);
+  }
+
+  function showParticipantPopup(data) {
+    const POPUP_ID = 'wu-participant-popup';
+    
+    // Existierendes Popup entfernen
+    const existing = document.getElementById(POPUP_ID);
+    if (existing) existing.remove();
+
+    const popup = document.createElement('div');
+    popup.id = POPUP_ID;
+    popup.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      padding: 20px;
+      z-index: 10000;
+      min-width: 300px;
+      font-family: system-ui, Arial, sans-serif;
+    `;
+
+    popup.innerHTML = `
+      <h3 style="margin: 0 0 15px; color: #0f6e85;">Veranstaltung hinzufügen</h3>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">
+          Teilnehmerzahl<span style="color: red;">*</span>
+        </label>
+        <input type="number" id="participant-count" min="1" placeholder="z.B. 30" 
+          style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button id="cancel-btn" style="padding: 8px 16px; border: 1px solid #ddd; background: white; cursor: pointer; border-radius: 4px;">
+          Abbrechen
+        </button>
+        <button id="confirm-btn" style="padding: 8px 16px; background: #0f6e85; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: 600;">
+          Bestätigen
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(popup);
+
+    return new Promise((resolve) => {
+      const input = document.getElementById('participant-count');
+      input.focus();
+
+      const confirm = () => {
+        const count = parseInt(input.value, 10);
+        if (count && count > 0) {
+          data.participantCount = count;
+          popup.remove();
+          resolve(data);
+        } else {
+          alert('Bitte geben Sie eine gültige Teilnehmerzahl ein.');
+        }
+      };
+
+      document.getElementById('confirm-btn').addEventListener('click', confirm);
+      document.getElementById('cancel-btn').addEventListener('click', () => {
+        popup.remove();
+        resolve(null);
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') confirm();
+        if (e.key === 'Escape') {
+          popup.remove();
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  function fillForm(data) {
+    if (!data) return;
+
+    // Datum setzen
+    const dateInput = document.querySelector('input[formcontrolname="date"], input[name="date"]');
+    if (dateInput && data.date) {
+      dateInput.value = data.date;
+      dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+      dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Startzeit setzen
+    const startSelect = document.querySelector('mat-select[formcontrolname="startTime"], select[name="startTime"]');
+    if (startSelect && data.startTime) {
+      startSelect.click();
+      setTimeout(() => {
+        const options = document.querySelectorAll('mat-option');
+        const targetOption = Array.from(options).find(opt => 
+          opt.textContent.trim() === data.startTime
+        );
+        if (targetOption) targetOption.click();
+      }, 100);
+    }
+
+    // Endzeit setzen
+    const endSelect = document.querySelector('mat-select[formcontrolname="endTime"], select[name="endTime"]');
+    if (endSelect && data.endTime) {
+      endSelect.click();
+      setTimeout(() => {
+        const options = document.querySelectorAll('mat-option');
+        const targetOption = Array.from(options).find(opt => 
+          opt.textContent.trim() === data.endTime
+        );
+        if (targetOption) targetOption.click();
+      }, 100);
+    }
+
+    // Gebäude auswählen
+    if (data.building) {
+      const buildingSelect = document.querySelector('mat-select[formcontrolname="building"], select[name="building"]');
+      if (buildingSelect) {
+        buildingSelect.click();
+        setTimeout(() => {
+          const options = document.querySelectorAll('mat-option');
+          const targetOption = Array.from(options).find(opt => 
+            opt.textContent.trim().includes(data.building)
+          );
+          if (targetOption) targetOption.click();
+        }, 100);
+      }
+    }
+
+    // Raumtyp oder Raum auswählen
+    if (data.roomType) {
+      const roomTypeSelect = document.querySelector('mat-select[formcontrolname="roomType"], select[name="roomType"]');
+      if (roomTypeSelect) {
+        roomTypeSelect.click();
+        setTimeout(() => {
+          const options = document.querySelectorAll('mat-option');
+          const targetOption = Array.from(options).find(opt => 
+            opt.textContent.trim().includes(data.roomType)
+          );
+          if (targetOption) targetOption.click();
+        }, 100);
+      }
+    }
+
+    // Teilnehmerzahl setzen
+    if (data.participantCount) {
+      const participantInput = document.querySelector('input[formcontrolname="participantCount"], input[name="participantCount"]');
+      if (participantInput) {
+        participantInput.value = data.participantCount;
+        participantInput.dispatchEvent(new Event('input', { bubbles: true }));
+        participantInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+  }
+
+  // Event-Listener für Kalender-Zellen
+  document.addEventListener('mousedown', (e) => {
+    const cell = e.target.closest('.chadmo-cell');
+    if (!cell || !isAvailableCell(cell)) return;
+
+    isDragging = true;
+    startCell = cell;
+    startTime = getColumnTime(cell);
+    roomName = getRoomName(cell);
+
+    clearHighlight();
+    highlightCells([cell]);
+    selectedCells = [cell];
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging || !startCell) return;
+
+    const cell = e.target.closest('.chadmo-cell');
+    if (!cell || !isAvailableCell(cell)) return;
+
+    // Nur in der gleichen Reihe (gleicher Raum)
+    if (cell.closest('.chadmo-row') !== startCell.closest('.chadmo-row')) return;
+
+    clearHighlight();
+    selectedCells = getCellsBetween(startCell, cell);
+    highlightCells(selectedCells);
+  });
+
+  document.addEventListener('mouseup', async (e) => {
+    if (!isDragging) return;
+
+    isDragging = false;
+    const endCell = e.target.closest('.chadmo-cell');
+
+    if (!startCell || !endCell || selectedCells.length === 0) {
+      clearHighlight();
+      return;
+    }
+
+    endTime = getColumnTime(selectedCells[selectedCells.length - 1]);
+    roomName = getRoomName(startCell);
+
+    if (!startTime || !endTime || !roomName) {
+      clearHighlight();
+      return;
+    }
+
+    // Popup für Teilnehmerzahl anzeigen
+    const result = await showParticipantPopup({
+      startTime,
+      endTime,
+      roomName
+    });
+
+    if (result) {
+      // Datum vom Header extrahieren
+      const dateLabel = document.querySelector('.usi-calendarHeader, .chadmo-gridsView .header')?.textContent || '';
+      const dateMatch = dateLabel.match(/(\d{1,2}\.\d{1,2}\.\d{4})/);
+      const date = dateMatch ? dateMatch[1] : '';
+
+      const building = extractBuilding(roomName);
+
+      fillForm({
+        date,
+        startTime: result.startTime,
+        endTime: result.endTime,
+        building: building + ' Gebäude',
+        roomType: roomName,
+        participantCount: result.participantCount
+      });
+    }
+
+    clearHighlight();
+  });
 })();
