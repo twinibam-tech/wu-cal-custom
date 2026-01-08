@@ -952,21 +952,39 @@
 
 /* ============================================================================
    WU – Bedingte Pflichtfelder: Teilnahmegebühren & Kooperationsveranstaltung
+   v2: Fix für doppelte Sterne + echte Submit-Validierung
    ============================================================================ */
 (function () {
   const STYLE_ID = "wu-conditional-required-style";
 
-  // CSS für die Pflichtfeld-Markierung
   const CSS = `
-    .wu-required-dynamic .mat-mdc-form-field-required-marker,
-    .wu-required-dynamic .mdc-floating-label::after {
-      content: " *" !important;
-      color: #d32f2f !important;
-      font-weight: 700 !important;
+    /* Pflichtfeld-Styling für dynamische Felder */
+    .wu-required-dynamic .mdc-text-field--outlined .mdc-notched-outline__leading,
+    .wu-required-dynamic .mdc-text-field--outlined .mdc-notched-outline__notch,
+    .wu-required-dynamic .mdc-text-field--outlined .mdc-notched-outline__trailing {
+      border-color: rgba(211, 47, 47, 0.6) !important;
     }
-    .wu-required-dynamic input,
-    .wu-required-dynamic textarea {
-      border-color: rgba(211, 47, 47, 0.5) !important;
+    .wu-required-dynamic .mdc-text-field--outlined:hover .mdc-notched-outline__leading,
+    .wu-required-dynamic .mdc-text-field--outlined:hover .mdc-notched-outline__notch,
+    .wu-required-dynamic .mdc-text-field--outlined:hover .mdc-notched-outline__trailing {
+      border-color: #d32f2f !important;
+    }
+    /* Fehlermeldung unter dem Feld */
+    .wu-validation-error {
+      color: #d32f2f;
+      font-size: 12px;
+      margin-top: 4px;
+      padding-left: 16px;
+      display: none;
+    }
+    .wu-required-dynamic.wu-show-error .wu-validation-error {
+      display: block;
+    }
+    .wu-required-dynamic.wu-show-error .mdc-notched-outline__leading,
+    .wu-required-dynamic.wu-show-error .mdc-notched-outline__notch,
+    .wu-required-dynamic.wu-show-error .mdc-notched-outline__trailing {
+      border-color: #d32f2f !important;
+      border-width: 2px !important;
     }
   `;
 
@@ -979,21 +997,21 @@
     }
   }
 
-  // Hilfsfunktion: Finde das Form-Field anhand des Label-Textes
+  // Finde Form-Field anhand des Label-Textes (partial match)
   function findFormFieldByLabel(labelText) {
-    const labels = document.querySelectorAll(
-      ".mat-mdc-form-field label, .mat-mdc-floating-label, .mdc-floating-label"
-    );
-    for (const label of labels) {
-      const text = (label.textContent || "").replace(/\s+/g, " ").trim();
-      if (text.toLowerCase().includes(labelText.toLowerCase())) {
-        return label.closest("mat-form-field, .mat-mdc-form-field");
+    const allFields = document.querySelectorAll("mat-form-field, .mat-mdc-form-field");
+    for (const field of allFields) {
+      const label = field.querySelector(".mdc-floating-label, .mat-mdc-floating-label, label");
+      if (!label) continue;
+      const text = (label.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (text.includes(labelText.toLowerCase())) {
+        return field;
       }
     }
     return null;
   }
 
-  // Hilfsfunktion: Finde mat-select anhand des Label-Textes
+  // Finde mat-select anhand des Label-Textes
   function findSelectByLabel(labelText) {
     const formField = findFormFieldByLabel(labelText);
     if (formField) {
@@ -1002,110 +1020,182 @@
     return null;
   }
 
-  // Hilfsfunktion: Setze Pflichtfeld-Status
+  // Prüft ob eine "Ja"-Option gewählt wurde
+  function isJaSelected(selectEl) {
+    if (!selectEl) return false;
+    const valueText = selectEl.querySelector(".mat-mdc-select-value-text, .mat-select-value-text");
+    const text = (valueText?.textContent || "").trim().toLowerCase();
+    return text.startsWith("ja");
+  }
+
+  // Prüft ob das Feld einen Wert hat
+  function hasValue(formField) {
+    if (!formField) return true;
+    const input = formField.querySelector("input, textarea");
+    if (input) {
+      return input.value.trim().length > 0;
+    }
+    return true;
+  }
+
+  // Setze Pflichtfeld-Status (nur visuell + Tracking)
   function setRequired(formField, isRequired) {
     if (!formField) return;
 
+    const label = formField.querySelector(".mdc-floating-label, .mat-mdc-floating-label, label");
     const input = formField.querySelector("input, textarea");
-    const label = formField.querySelector(
-      ".mat-mdc-floating-label, .mdc-floating-label, label"
-    );
 
     if (isRequired) {
       formField.classList.add("wu-required-dynamic");
-      if (input) {
-        input.setAttribute("required", "required");
-        input.setAttribute("aria-required", "true");
+      formField.dataset.wuRequired = "true";
+
+      // Nur Sternchen hinzufügen wenn keins existiert
+      if (label) {
+        const existingMarker = label.querySelector(".mat-mdc-form-field-required-marker, .wu-required-star");
+        const labelText = label.textContent || "";
+        if (!existingMarker && !labelText.includes("*")) {
+          const star = document.createElement("span");
+          star.className = "wu-required-star";
+          star.textContent = " *";
+          star.style.cssText = "color: #d32f2f; font-weight: 700;";
+          label.appendChild(star);
+        }
       }
-      // Füge Sternchen zum Label hinzu, falls noch nicht vorhanden
-      if (label && !label.querySelector(".wu-required-star")) {
-        const star = document.createElement("span");
-        star.className = "wu-required-star mat-mdc-form-field-required-marker";
-        star.textContent = " *";
-        star.style.color = "#d32f2f";
-        star.style.fontWeight = "700";
-        label.appendChild(star);
+
+      // Fehlermeldung hinzufügen wenn nicht vorhanden
+      if (!formField.querySelector(".wu-validation-error")) {
+        const errorEl = document.createElement("div");
+        errorEl.className = "wu-validation-error";
+        errorEl.textContent = "Dieses Feld ist erforderlich";
+        formField.appendChild(errorEl);
+      }
+
+      // Live-Validierung bei Input
+      if (input && !input.dataset.wuValidationBound) {
+        input.dataset.wuValidationBound = "true";
+        input.addEventListener("input", () => {
+          if (hasValue(formField)) {
+            formField.classList.remove("wu-show-error");
+          }
+        });
+        input.addEventListener("blur", () => {
+          if (formField.dataset.wuRequired === "true" && !hasValue(formField)) {
+            formField.classList.add("wu-show-error");
+          }
+        });
       }
     } else {
-      formField.classList.remove("wu-required-dynamic");
-      if (input) {
-        input.removeAttribute("required");
-        input.removeAttribute("aria-required");
-      }
-      // Entferne das Sternchen
+      formField.classList.remove("wu-required-dynamic", "wu-show-error");
+      formField.dataset.wuRequired = "false";
+
+      // Entferne nur das von uns hinzugefügte Sternchen
       const star = label?.querySelector(".wu-required-star");
       if (star) star.remove();
     }
   }
 
-  // Prüft ob eine "Ja"-Option gewählt wurde
-  function isJaSelected(selectEl) {
-    if (!selectEl) return false;
-    const valueText = selectEl.querySelector(".mat-mdc-select-value-text");
-    const text = (valueText?.textContent || "").trim().toLowerCase();
-    return text.startsWith("ja");
+  // Submit-Validierung
+  function setupSubmitValidation() {
+    // Finde alle Submit-Buttons
+    const submitButtons = document.querySelectorAll(
+      'button[type="submit"], button.mat-primary, button[color="primary"]'
+    );
+
+    submitButtons.forEach((btn) => {
+      if (btn.dataset.wuValidationBound) return;
+      btn.dataset.wuValidationBound = "true";
+
+      btn.addEventListener(
+        "click",
+        (e) => {
+          const requiredFields = document.querySelectorAll('[data-wu-required="true"]');
+          let hasErrors = false;
+
+          requiredFields.forEach((field) => {
+            if (!hasValue(field)) {
+              field.classList.add("wu-show-error");
+              hasErrors = true;
+
+              // Scroll zum ersten Fehler
+              if (!hasErrors) {
+                field.scrollIntoView({ behavior: "smooth", block: "center" });
+              }
+            }
+          });
+
+          if (hasErrors) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Scroll zum ersten Fehlerfeld
+            const firstError = document.querySelector(".wu-show-error");
+            if (firstError) {
+              firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+              const input = firstError.querySelector("input, textarea");
+              if (input) input.focus();
+            }
+
+            return false;
+          }
+        },
+        true
+      ); // capture phase
+    });
   }
 
-  // Hauptlogik: Überwache Änderungen und setze Pflichtfelder
+  // Überwache Select-Änderungen
+  function watchSelect(selectEl, targetField) {
+    if (!selectEl || !targetField) return;
+
+    // Initial prüfen
+    setRequired(targetField, isJaSelected(selectEl));
+
+    // MutationObserver für Änderungen
+    const observer = new MutationObserver(() => {
+      setRequired(targetField, isJaSelected(selectEl));
+    });
+    observer.observe(selectEl, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+    });
+
+    // Auch auf Overlay-Schließung reagieren (Dropdown)
+    document.addEventListener("click", (e) => {
+      if (e.target.closest(".mat-mdc-option, .mat-option")) {
+        setTimeout(() => {
+          setRequired(targetField, isJaSelected(selectEl));
+        }, 150);
+      }
+    });
+  }
+
+  // Hauptlogik
   function setupConditionalRequired() {
     // 1) Teilnahmegebühren -> "Wenn ja, in welcher Höhe?"
     const teilnahmeSelect = findSelectByLabel("Erheben Sie Teilnahmegebühren");
     const hoeheField = findFormFieldByLabel("Wenn ja, in welcher Höhe");
 
     if (teilnahmeSelect && hoeheField) {
-      // Initial prüfen
-      setRequired(hoeheField, isJaSelected(teilnahmeSelect));
-
-      // MutationObserver für Änderungen am Select-Wert
-      const observer1 = new MutationObserver(() => {
-        setRequired(hoeheField, isJaSelected(teilnahmeSelect));
-      });
-      observer1.observe(teilnahmeSelect, {
-        subtree: true,
-        childList: true,
-        characterData: true,
-      });
-
-      // Auch auf Click-Events reagieren (für Dropdown-Auswahl)
-      teilnahmeSelect.addEventListener("click", () => {
-        setTimeout(
-          () => setRequired(hoeheField, isJaSelected(teilnahmeSelect)),
-          100
-        );
-      });
+      watchSelect(teilnahmeSelect, hoeheField);
     }
 
-    // 2) Kooperationsveranstaltung -> "Wenn ja, bitte den /die Kooperationspartner*in angeben"
+    // 2) Kooperationsveranstaltung -> Kooperationspartner
     const koopSelect = findSelectByLabel("Kooperationsveranstaltung");
     const partnerField = findFormFieldByLabel("Kooperationspartner");
 
     if (koopSelect && partnerField) {
-      // Initial prüfen
-      setRequired(partnerField, isJaSelected(koopSelect));
-
-      const observer2 = new MutationObserver(() => {
-        setRequired(partnerField, isJaSelected(koopSelect));
-      });
-      observer2.observe(koopSelect, {
-        subtree: true,
-        childList: true,
-        characterData: true,
-      });
-
-      koopSelect.addEventListener("click", () => {
-        setTimeout(
-          () => setRequired(partnerField, isJaSelected(koopSelect)),
-          100
-        );
-      });
+      watchSelect(koopSelect, partnerField);
     }
+
+    // Submit-Validierung einrichten
+    setupSubmitValidation();
   }
 
   // Init
   ensureStyle();
 
   function init() {
-    // Warte bis die Formularfelder geladen sind
     const checkInterval = setInterval(() => {
       const teilnahmeSelect = findSelectByLabel("Erheben Sie Teilnahmegebühren");
       if (teilnahmeSelect) {
@@ -1114,7 +1204,6 @@
       }
     }, 500);
 
-    // Timeout nach 30 Sekunden
     setTimeout(() => clearInterval(checkInterval), 30000);
   }
 
@@ -1124,12 +1213,14 @@
     init();
   }
 
-  // SPA-Resilienz: bei Navigation neu initialisieren
+  // SPA-Resilienz
   let lastUrl = location.href;
   new MutationObserver(() => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
       setTimeout(init, 1000);
     }
+    // Auch Submit-Buttons neu binden bei DOM-Änderungen
+    setupSubmitValidation();
   }).observe(document.documentElement, { subtree: true, childList: true });
 })();
