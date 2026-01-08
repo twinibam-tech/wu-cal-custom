@@ -949,3 +949,187 @@
   // SPA-Resilienz
   new MutationObserver(linkifyFeatures).observe(document.documentElement, { childList:true, subtree:true });
 })();
+
+/* ============================================================================
+   WU – Bedingte Pflichtfelder: Teilnahmegebühren & Kooperationsveranstaltung
+   ============================================================================ */
+(function () {
+  const STYLE_ID = "wu-conditional-required-style";
+
+  // CSS für die Pflichtfeld-Markierung
+  const CSS = `
+    .wu-required-dynamic .mat-mdc-form-field-required-marker,
+    .wu-required-dynamic .mdc-floating-label::after {
+      content: " *" !important;
+      color: #d32f2f !important;
+      font-weight: 700 !important;
+    }
+    .wu-required-dynamic input,
+    .wu-required-dynamic textarea {
+      border-color: rgba(211, 47, 47, 0.5) !important;
+    }
+  `;
+
+  function ensureStyle() {
+    if (!document.getElementById(STYLE_ID)) {
+      const s = document.createElement("style");
+      s.id = STYLE_ID;
+      s.textContent = CSS;
+      document.head.appendChild(s);
+    }
+  }
+
+  // Hilfsfunktion: Finde das Form-Field anhand des Label-Textes
+  function findFormFieldByLabel(labelText) {
+    const labels = document.querySelectorAll(
+      ".mat-mdc-form-field label, .mat-mdc-floating-label, .mdc-floating-label"
+    );
+    for (const label of labels) {
+      const text = (label.textContent || "").replace(/\s+/g, " ").trim();
+      if (text.toLowerCase().includes(labelText.toLowerCase())) {
+        return label.closest("mat-form-field, .mat-mdc-form-field");
+      }
+    }
+    return null;
+  }
+
+  // Hilfsfunktion: Finde mat-select anhand des Label-Textes
+  function findSelectByLabel(labelText) {
+    const formField = findFormFieldByLabel(labelText);
+    if (formField) {
+      return formField.querySelector("mat-select");
+    }
+    return null;
+  }
+
+  // Hilfsfunktion: Setze Pflichtfeld-Status
+  function setRequired(formField, isRequired) {
+    if (!formField) return;
+
+    const input = formField.querySelector("input, textarea");
+    const label = formField.querySelector(
+      ".mat-mdc-floating-label, .mdc-floating-label, label"
+    );
+
+    if (isRequired) {
+      formField.classList.add("wu-required-dynamic");
+      if (input) {
+        input.setAttribute("required", "required");
+        input.setAttribute("aria-required", "true");
+      }
+      // Füge Sternchen zum Label hinzu, falls noch nicht vorhanden
+      if (label && !label.querySelector(".wu-required-star")) {
+        const star = document.createElement("span");
+        star.className = "wu-required-star mat-mdc-form-field-required-marker";
+        star.textContent = " *";
+        star.style.color = "#d32f2f";
+        star.style.fontWeight = "700";
+        label.appendChild(star);
+      }
+    } else {
+      formField.classList.remove("wu-required-dynamic");
+      if (input) {
+        input.removeAttribute("required");
+        input.removeAttribute("aria-required");
+      }
+      // Entferne das Sternchen
+      const star = label?.querySelector(".wu-required-star");
+      if (star) star.remove();
+    }
+  }
+
+  // Prüft ob eine "Ja"-Option gewählt wurde
+  function isJaSelected(selectEl) {
+    if (!selectEl) return false;
+    const valueText = selectEl.querySelector(".mat-mdc-select-value-text");
+    const text = (valueText?.textContent || "").trim().toLowerCase();
+    return text.startsWith("ja");
+  }
+
+  // Hauptlogik: Überwache Änderungen und setze Pflichtfelder
+  function setupConditionalRequired() {
+    // 1) Teilnahmegebühren -> "Wenn ja, in welcher Höhe?"
+    const teilnahmeSelect = findSelectByLabel("Erheben Sie Teilnahmegebühren");
+    const hoeheField = findFormFieldByLabel("Wenn ja, in welcher Höhe");
+
+    if (teilnahmeSelect && hoeheField) {
+      // Initial prüfen
+      setRequired(hoeheField, isJaSelected(teilnahmeSelect));
+
+      // MutationObserver für Änderungen am Select-Wert
+      const observer1 = new MutationObserver(() => {
+        setRequired(hoeheField, isJaSelected(teilnahmeSelect));
+      });
+      observer1.observe(teilnahmeSelect, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+      });
+
+      // Auch auf Click-Events reagieren (für Dropdown-Auswahl)
+      teilnahmeSelect.addEventListener("click", () => {
+        setTimeout(
+          () => setRequired(hoeheField, isJaSelected(teilnahmeSelect)),
+          100
+        );
+      });
+    }
+
+    // 2) Kooperationsveranstaltung -> "Wenn ja, bitte den /die Kooperationspartner*in angeben"
+    const koopSelect = findSelectByLabel("Kooperationsveranstaltung");
+    const partnerField = findFormFieldByLabel("Kooperationspartner");
+
+    if (koopSelect && partnerField) {
+      // Initial prüfen
+      setRequired(partnerField, isJaSelected(koopSelect));
+
+      const observer2 = new MutationObserver(() => {
+        setRequired(partnerField, isJaSelected(koopSelect));
+      });
+      observer2.observe(koopSelect, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+      });
+
+      koopSelect.addEventListener("click", () => {
+        setTimeout(
+          () => setRequired(partnerField, isJaSelected(koopSelect)),
+          100
+        );
+      });
+    }
+  }
+
+  // Init
+  ensureStyle();
+
+  function init() {
+    // Warte bis die Formularfelder geladen sind
+    const checkInterval = setInterval(() => {
+      const teilnahmeSelect = findSelectByLabel("Erheben Sie Teilnahmegebühren");
+      if (teilnahmeSelect) {
+        clearInterval(checkInterval);
+        setupConditionalRequired();
+      }
+    }, 500);
+
+    // Timeout nach 30 Sekunden
+    setTimeout(() => clearInterval(checkInterval), 30000);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  // SPA-Resilienz: bei Navigation neu initialisieren
+  let lastUrl = location.href;
+  new MutationObserver(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      setTimeout(init, 1000);
+    }
+  }).observe(document.documentElement, { subtree: true, childList: true });
+})();
