@@ -1,4 +1,3 @@
-
 /* wu-cal-custom.js – CSS-Injection + "SPACE" -> "Räume" (ohne Badge) */
 (function () {
   const STYLE_ID = "wu-inline-css";
@@ -158,8 +157,10 @@
 /* ============================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
    V7.2: Fix für rechte Rand-Spalte (z. B. 21:00) + Raum-Zeile entfernt
+   DEAKTIVIERT
    ============================================================================ */
 (function () {
+  return; // DEAKTIVIERT
   const STYLE_ID = "wu-unavail-v7-style";
   const POPOVER_ID = "wu-unavail-popover";
 
@@ -321,10 +322,11 @@
 
 /* ============================================================================
    WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.2
+   DEAKTIVIERT
    ============================================================================ */
 (function () {
   const CFG = {
-    enabled: true,
+    enabled: false, // DEAKTIVIERT (war: true)
     title: "Wichtige Info",
     html: `
       <div class="wu-callout">
@@ -678,7 +680,7 @@
       let s = 0;
       if (TEXT_PREFER.test(text) || TEXT_PREFER.test(href)) s += 5;
       if (TEXT_DEPRIORITIZE.test(text) || TEXT_DEPRIORITIZE.test(href)) s -= 5;
-      // kurze, „zentrale“ Ziele bevorzugen
+      // kurze, „zentrale" Ziele bevorzugen
       try {
         const u = new URL(href, location.href);
         const pathLen = (u.pathname || '/').split('/').filter(Boolean).length;
@@ -864,7 +866,7 @@
     if (onSurface) return;
 
     // 4) innerhalb des Containers, aber außerhalb der größten Medienfläche → schließen
-    //    Margin erhöhen, wenn „nah am Bildrand“ noch als „drin“ zählen soll (z. B. 8)
+    //    Margin erhöhen, wenn „nah am Bildrand" noch als „drin" zählen soll (z. B. 8)
     if (!pointInRect(x, y, mediaRect, 2)) {
       safeClose();
     }
