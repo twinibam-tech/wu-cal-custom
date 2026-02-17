@@ -151,12 +151,11 @@
     renameSpaceOnce();
     hideMonthTabAndSwitch();
   }).observe(document.documentElement, {subtree:true, childList:true});
-})(); 
+})();
 
 
 /* ============================================================================
    WU – Klick auf graue Kästchen -> Popover "Nicht verfügbar"
-   V7.2: Fix für rechte Rand-Spalte (z. B. 21:00) + Raum-Zeile entfernt
    DEAKTIVIERT
    ============================================================================ */
 (function () {
@@ -225,7 +224,7 @@
 
   function timeBoundaries(colCount){
     const startHour = 8;
-    const len = colCount + 2; // extra slot for right edge
+    const len = colCount + 2;
     return Array.from({length: len}, (_,i) => String(startHour+i).padStart(2,"0")+":00");
   }
 
@@ -234,7 +233,7 @@
     const m = measureRow(row); if (!m) return ["",""];
     const bounds = timeBoundaries(m.colCount);
     const minX = m.left0;
-    const maxX = m.left0 + m.width * (m.colCount + 0.5); // extend detection zone
+    const maxX = m.left0 + m.width * (m.colCount + 0.5);
     const clampedX = Math.min(Math.max(clientX, minX), maxX);
     let idx = Math.floor((clampedX - m.left0) / m.width);
     idx = Math.max(0, Math.min(idx, bounds.length - 2));
@@ -287,7 +286,6 @@
     ensureStyle(); ensurePopover();
     pop.querySelector(".time").textContent = (from&&to)? `${from} – ${to}` : "–";
     pop.querySelector(".date").textContent = dateLabel();
-
     pop.style.visibility="hidden";
     pop.classList.add("is-open");
     document.getElementById(POPOVER_ID+"-backdrop").classList.add("is-open");
@@ -321,38 +319,10 @@
 })();
 
 /* ============================================================================
-   WU – Hinweis-Popup (Modal) + fixer "Hilfe & Infos"-Button – türkis – v5.2
-   DEAKTIVIERT
+   WU – Fixer "Hilfe & Infos"-Button – eckig – v5.3
+   Modal-Popup DEAKTIVIERT; nur Button + Popover mit Kontakttext aktiv
    ============================================================================ */
 (function () {
-  const CFG = {
-    enabled: false, // DEAKTIVIERT (war: true)
-    title: "Wichtige Info",
-    html: `
-      <div class="wu-callout">
-        <div class="wu-callout-icon" aria-hidden="true">ℹ️</div>
-        <div class="wu-callout-content">           
-            <p><strong>Für vollständige und aktuelle Informationen nutzen Sie bitte folgende Tools:</strong></p>
-        </div>
-      </div>
-
-      <div class="wu-cta-row">
-        <a class="wu-btn wu-btn-primary" href="https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1" target="_blank" rel="noopener" aria-label="Rauminfo-Tool öffnen">
-          <span class="wu-btn-icon">⌂</span><span class="wu-btn-label">Rauminfo-Tool öffnen</span>
-        </a>
-        <a class="wu-btn" href="https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1" target="_blank" rel="noopener" aria-label="Leitfaden bald Verfügbar">
-          <span class="wu-btn-icon">📄</span><span class="wu-btn-label">Leitfaden bald Verfügbar</span>
-        </a>
-      </div>
-
-      <p class="wu-contact">Fragen? Wir helfen gerne weiter: <a href="mailto:events@wu.ac.at">events@wu.ac.at</a></p>
-    `,
-    delayMs: 900,
-    showOncePerDay: true,
-    storageKey: "wu-info-modal-lastSeen"
-  };
-  if (!CFG.enabled) return;
-
   const THEME = {
     primary: "#0f6e85",
     primaryDark: "#0d5f73",
@@ -360,199 +330,56 @@
     surfaceAlt: "#f5f9f9",
     text: "#0a171a",
     textMuted: "#41616a",
-    link: "#0f6e85",
-    radiusLg: "14px",
-    radiusSm: "10px",
-    shadow: "0 14px 40px rgba(0,0,0,.18)",
-    blur: "4px"
+    shadow: "0 14px 40px rgba(0,0,0,.18)"
   };
 
-  const MODAL_ID = "wu-info-modal";
-  const STYLE_ID = "wu-info-modal-style-v52";
-  const HELP_BTN_ID = "wu-help-button";
+  const HELP_BTN_ID    = "wu-help-button";
   const HELP_POPOVER_ID = "wu-help-popover";
+  const STYLE_ID        = "wu-help-button-style";
 
   const CSS = `
-/* --- Backdrop ------------------------------------------------------------ */
-#${MODAL_ID}-backdrop{
-  position:fixed; inset:0; background:rgba(8,28,33,.36);
-  -webkit-backdrop-filter:blur(${THEME.blur}); backdrop-filter:blur(${THEME.blur});
-  opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:2147483645;
-}
-#${MODAL_ID}-backdrop.is-open{ opacity:1; pointer-events:auto; }
-
-/* --- Container & Dialog -------------------------------------------------- */
-#${MODAL_ID}{ position:fixed; inset:0; display:grid; place-items:center;
-  z-index:2147483646; opacity:0; pointer-events:none; transition:opacity .18s ease; }
-#${MODAL_ID}.is-open{ opacity:1; pointer-events:auto; }
-
-#${MODAL_ID} .dialog{
-  width:min(660px,92vw); background:${THEME.surface}; color:${THEME.text};
-  border:1px solid rgba(0,0,0,.06); border-radius:${THEME.radiusLg};
-  box-shadow:${THEME.shadow}; overflow:hidden;
-  transform:translateY(6px) scale(.98); transition:transform .22s cubic-bezier(.2,.7,.2,1);
-}
-#${MODAL_ID}.is-open .dialog{ transform:translateY(0) scale(1); }
-
-#${MODAL_ID} .accent{ height:6px; background:linear-gradient(90deg, ${THEME.primary}, ${THEME.primaryDark}); }
-
-#${MODAL_ID} .header{ display:flex; align-items:center; gap:10px; padding:14px 18px 6px; }
-/* Icon ohne farbige Kachel */
-#${MODAL_ID} .icon{
-  width:auto; height:auto; border-radius:0; background:transparent; padding:0;
-  color:${THEME.primary}; font:700 18px/1 system-ui;
-}
-#${MODAL_ID} .title{ font:600 18px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
-
-#${MODAL_ID} .body{ padding:8px 18px 8px; font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
-#${MODAL_ID} .body a{ color:${THEME.link}; text-underline-offset:2px; }
-#${MODAL_ID} .body p{ margin:0 0 10px; }
-#${MODAL_ID} .body .wu-contact{ color:${THEME.textMuted}; margin-top:12px; }
-
-/* Callout-Stil */
-#${MODAL_ID} .wu-callout{ display:flex; gap:12px; padding:12px; background:${THEME.surfaceAlt};
-  border:1px solid rgba(0,0,0,.06); border-radius:${THEME.radiusSm}; margin:2px 0 12px; }
-/* Callout-Icon ohne Kachel */
-#${MODAL_ID} .wu-callout-icon{
-  width:auto; height:auto; border-radius:0; background:transparent; padding:0;
-  color:${THEME.primary}; font:700 18px/1 system-ui; flex:0 0 auto;
-}
-#${MODAL_ID} .wu-callout-title{ font-weight:700; margin-bottom:6px; }
-
-/* CTA-Reihe */
-#${MODAL_ID} .wu-cta-row{ display:flex; flex-wrap:wrap; gap:10px; margin:8px 0 6px; }
-#${MODAL_ID} .wu-btn{
-  display:inline-flex; align-items:center; gap:8px;
-  padding:10px 14px; border:1px solid rgba(0,0,0,.12);
-  border-radius:${THEME.radiusSm}; background:#fff; color:${THEME.text} !important;
-  font:600 14px/1 system-ui; text-decoration:none !important; cursor:pointer;
-  transition:background .15s ease,border-color .15s ease,transform .02s ease;
-}
-#${MODAL_ID} .wu-btn:hover{ background:#eef6f7; }
-#${MODAL_ID} .wu-btn:active{ transform:translateY(1px); }
-#${MODAL_ID} .wu-btn-icon{ font-size:16px; line-height:1; }
-#${MODAL_ID} .wu-btn-primary{ background:${THEME.primary}; border-color:${THEME.primary}; color:#fff !important; }
-#${MODAL_ID} .wu-btn-primary:hover{ background:${THEME.primaryDark}; }
-
-/* Footer */
-#${MODAL_ID} .footer{
-  display:flex; align-items:center; gap:10px; padding:12px 18px;
-  background:${THEME.surfaceAlt}; border-top:1px solid rgba(0,0,0,.05);
-  border-bottom-left-radius:${THEME.radiusLg}; border-bottom-right-radius:${THEME.radiusLg};
-}
-#${MODAL_ID} .left{ margin-right:auto; display:inline-flex; align-items:center; gap:8px;
-  color:${THEME.textMuted}; font:13px/1.1 system-ui; }
-#${MODAL_ID} input[type="checkbox"]{ transform:translateY(1px); }
-
-#${MODAL_ID} button{
-  appearance:none; border:1px solid rgba(0,0,0,.12); background:#fff; color:${THEME.text};
-  padding:9px 14px; border-radius:${THEME.radiusSm}; font:600 14px/1 system-ui; cursor:pointer;
-  transition:background .15s ease, border-color .15s ease, transform .02s ease;
-}
-#${MODAL_ID} button.primary{ background:${THEME.primary}; border-color:${THEME.primary}; color:#fff; }
-#${MODAL_ID} button.primary:hover{ background:${THEME.primaryDark}; }
-
-/* --- Fixer "Hilfe & Infos"-Button unten rechts (fixed) ------------------- */
+/* --- Fixer "Hilfe & Infos"-Button unten rechts (fixed, eckig) ------------ */
 #${HELP_BTN_ID}{
   position:fixed; bottom:14px; right:14px; z-index:2147483647;
-  padding:8px 12px; border-radius:999px; background:${THEME.primary}; color:#fff;
+  padding:8px 14px; border-radius:4px; background:${THEME.primary}; color:#fff;
   font:600 13px/1 system-ui; border:1px solid ${THEME.primaryDark};
   box-shadow:0 6px 16px rgba(0,0,0,.18); cursor:pointer; user-select:none;
 }
 #${HELP_BTN_ID}:hover{ background:${THEME.primaryDark}; }
-/* Vorsorglicher Header-Override ausschalten (immer fixed) */
-.usi-gradientbackground #${HELP_BTN_ID}{ position:fixed; bottom:14px; right:14px; }
 
-/* Popover: oberhalb des Buttons, rechtsbündig ausrichten */
+/* Popover: oberhalb des Buttons, rechtsbündig, eckig */
 #${HELP_POPOVER_ID}{
   position:fixed; bottom:56px; right:14px; z-index:2147483647;
-  min-width:260px; background:#fff; border:1px solid rgba(0,0,0,.08);
-  border-radius:${THEME.radiusSm}; box-shadow:${THEME.shadow}; padding:8px; display:none;
+  min-width:280px; background:#fff; border:1px solid rgba(0,0,0,.08);
+  border-radius:4px; box-shadow:${THEME.shadow}; padding:8px; display:none;
 }
 #${HELP_POPOVER_ID}.open{ display:block; }
 #${HELP_POPOVER_ID} a{
-  display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px;
+  display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:3px;
   color:${THEME.text}; text-decoration:none;
 }
 #${HELP_POPOVER_ID} a:hover{ background:${THEME.surfaceAlt}; }
 #${HELP_POPOVER_ID} .accent{
-  display:inline-grid; place-items:center; width:22px; height:22px; border-radius:6px;
-  background:${THEME.primary}; color:#fff; font-weight:700;
+  display:inline-grid; place-items:center; width:22px; height:22px; border-radius:3px;
+  background:${THEME.primary}; color:#fff; font-weight:700; flex:0 0 auto;
 }
 #${HELP_POPOVER_ID} .sep{ height:1px; background:rgba(0,0,0,.06); margin:6px 0; }
-
-@media (prefers-reduced-motion: reduce) {
-  #${MODAL_ID}-backdrop, #${MODAL_ID}, #${MODAL_ID} .dialog { transition:none !important; }
+#${HELP_POPOVER_ID} .contact-text{
+  padding:8px 10px; font:13px/1.5 system-ui; color:${THEME.textMuted};
 }
+#${HELP_POPOVER_ID} .contact-text a{
+  display:inline; padding:0; color:${THEME.primary}; text-decoration:underline;
+}
+#${HELP_POPOVER_ID} .contact-text a:hover{ background:transparent; text-decoration:none; }
 `;
-
-  function todayKey(){
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-  }
-  function alreadySeenToday(){
-    if (!CFG.showOncePerDay) return false;
-    try { return localStorage.getItem(CFG.storageKey) === todayKey(); } catch { return false; }
-  }
-  function markSeenToday(){
-    if (!CFG.showOncePerDay) return;
-    try { localStorage.setItem(CFG.storageKey, todayKey()); } catch {}
-  }
 
   function ensureStyle(){
     if (!document.getElementById(STYLE_ID)) {
-      const s = document.createElement("style"); s.id = STYLE_ID; s.textContent = CSS; document.head.appendChild(s);
+      const s = document.createElement("style"); s.id = STYLE_ID; s.textContent = CSS;
+      document.head.appendChild(s);
     }
   }
 
-  // ----------------------------- Modal -------------------------------------
-  function buildModal(){
-    if (document.getElementById(MODAL_ID)) return;
-
-    const backdrop = document.createElement("div");
-    backdrop.id = MODAL_ID + "-backdrop";
-
-    const modal = document.createElement("div");
-    modal.id = MODAL_ID; modal.setAttribute("role","dialog"); modal.setAttribute("aria-modal","true");
-    modal.innerHTML = `
-      <div class="dialog" role="document">
-        <div class="accent"></div>
-        <div class="header">
-          <div class="icon" aria-hidden="true">i</div>
-          <div class="title">${CFG.title}</div>
-        </div>
-        <div class="body">${CFG.html}</div>
-        <div class="footer">
-          <label class="left"><input type="checkbox" id="${MODAL_ID}-mute"> Heute nicht mehr zeigen</label>
-          <button class="primary" id="${MODAL_ID}-close">Schließen</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(backdrop);
-    document.body.appendChild(modal);
-
-    function close(){
-      modal.classList.remove("is-open");
-      backdrop.classList.remove("is-open");
-      const mute = document.getElementById(`${MODAL_ID}-mute`);
-      if (mute && mute.checked) markSeenToday();
-    }
-
-    // Schließen: Button, ESC, Backdrop-Klick & Klick außerhalb
-    modal.querySelector(`#${MODAL_ID}-close`).addEventListener("click", close);
-    backdrop.addEventListener("click", close);
-    modal.addEventListener("click", (e) => { if (!e.target.closest(".dialog")) close(); });
-    window.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
-  }
-
-  function openModal(){
-    ensureStyle(); buildModal();
-    document.getElementById(MODAL_ID + "-backdrop").classList.add("is-open");
-    document.getElementById(MODAL_ID).classList.add("is-open");
-    setTimeout(()=> document.querySelector(`#${MODAL_ID} button.primary`)?.focus?.(), 40);
-  }
-
-  // --------------------- fixer Hilfe-&-Infos-Button ------------------------
   function ensureHelpButton(){
     if (!document.getElementById(HELP_BTN_ID)) {
       const btn = document.createElement("button");
@@ -560,7 +387,6 @@
       btn.type = "button";
       btn.textContent = "Hilfe & Infos";
       btn.addEventListener("click", toggleHelpPopover);
-      // fixed unten-rechts
       document.body.appendChild(btn);
     }
     if (!document.getElementById(HELP_POPOVER_ID)) {
@@ -574,70 +400,59 @@
           <span class="accent">📄</span><span>Handbuch (PDF)</span>
         </a>
         <div class="sep"></div>
-        <a href="javascript:void(0)" id="${HELP_POPOVER_ID}-openmodal">
-          <span class="accent">i</span><span>Hinweis erneut anzeigen</span>
-        </a>
+        <div class="contact-text">
+          Sie haben Fragen bzw. brauchen Unterstützung?<br>
+          Wir helfen gerne weiter: <a href="mailto:events@wu.ac.at">events@wu.ac.at</a>
+        </div>
       `;
       document.body.appendChild(pop);
-      pop.querySelector(`#${HELP_POPOVER_ID}-openmodal`).addEventListener("click", () => {
-        closeHelpPopover(); openModal();
-      });
-      // global schließen bei Außenklick
-      document.addEventListener("click", (e)=>{
+
+      // Außenklick schließt Popover
+      document.addEventListener("click", (e) => {
         const t = e.target;
         if (!t.closest(`#${HELP_POPOVER_ID}`) && !t.closest(`#${HELP_BTN_ID}`)) closeHelpPopover();
       }, true);
     }
     syncPopoverPosition();
   }
+
   function toggleHelpPopover(){
     const pop = document.getElementById(HELP_POPOVER_ID);
-    pop.classList.toggle("open");
+    if (pop) pop.classList.toggle("open");
     syncPopoverPosition();
   }
+
   function closeHelpPopover(){
     const pop = document.getElementById(HELP_POPOVER_ID);
     if (pop) pop.classList.remove("open");
   }
 
-  // Positionierung: Popover oberhalb des (fixen) Buttons, rechtsbündig
   function syncPopoverPosition(){
     const btn = document.getElementById(HELP_BTN_ID);
     const pop = document.getElementById(HELP_POPOVER_ID);
     if (!btn || !pop) return;
     const r = btn.getBoundingClientRect();
-    pop.style.top = "auto";
-    pop.style.right = Math.max(14, window.innerWidth - r.right) + "px";
-    // Unterkante des Popovers 56px über der Viewport-Unterkante (sicher über Button)
+    pop.style.top    = "auto";
+    pop.style.right  = Math.max(14, window.innerWidth - r.right) + "px";
     pop.style.bottom = Math.max(56, window.innerHeight - r.top + 8) + "px";
   }
-
-  // öffentlich: Modal manuell öffnen
-  window.WU_ShowInfoModal = () => openModal();
 
   // Init
   ensureStyle();
   ensureHelpButton();
 
-  // SPA/Redraw-Resilienz
+  // SPA-Resilienz
   new MutationObserver(() => ensureHelpButton())
     .observe(document.documentElement, {childList:true, subtree:true});
 
   window.addEventListener("resize", syncPopoverPosition);
   window.addEventListener("scroll", syncPopoverPosition, {passive:true});
+})();
 
-  // Auto-Öffnen (einmal pro Tag)
-  if (!alreadySeenToday()) {
-    const start = () => setTimeout(() => openModal(), CFG.delayMs);
-    (document.readyState === "loading") ? document.addEventListener("DOMContentLoaded", start) : start();
-  }
-  })();
 /* ============================================================================
-   WU – WU-Logo als Home-Button: klickt den besten Header-Link (z. B. "Raumanfrage")
-   statt auf eine fixe URL zu navigieren. Fallbacks enthalten.
+   WU – WU-Logo als Home-Button
    ============================================================================ */
 (function () {
-  // 1) Kandidaten für das Logo (bei euch .usi-companyLogo > img)
   const LOGO_SELECTORS = [
     '.usi-headerModuleWrapper .usi-companyLogo img',
     '.usi-headerModuleWrapper .usi-companyLogo',
@@ -646,7 +461,6 @@
     'img[alt*="WU" i]'
   ];
 
-  // 2) So suchen wir den "Home"-Link im Header/Nav
   const LINK_SELECTORS = [
     '.usi-headerModuleWrapper a[href]',
     'header a[href]',
@@ -656,12 +470,10 @@
   const TEXT_DEPRIORITIZE = /(logout|abmelden|handbuch|pdf|hilfe|kontakt)/i;
 
   function pickHomeLink(){
-    // sammle alle Links aus den Header-Bereichen
     const links = [];
     for (const sel of LINK_SELECTORS) {
       document.querySelectorAll(sel).forEach(a => links.push(a));
     }
-    // filtern: nur sichtbare, klickbare, http/relative, gleiche Origin falls absolut
     const clean = links.filter(a => {
       if (!a || a.offsetParent === null) return false;
       const href = (a.getAttribute('href') || '').trim();
@@ -670,17 +482,14 @@
       if (/^https?:\/\//i.test(href) && new URL(href, location.href).origin !== location.origin) return false;
       return true;
     });
-
     if (!clean.length) return null;
 
-    // scoren: Bevorzugt passende Bezeichnungen, kürzere Pfade, keine Depriorisierten
     function score(a){
       const text = (a.textContent || a.getAttribute('title') || '').trim();
       const href = a.getAttribute('href') || '';
       let s = 0;
       if (TEXT_PREFER.test(text) || TEXT_PREFER.test(href)) s += 5;
       if (TEXT_DEPRIORITIZE.test(text) || TEXT_DEPRIORITIZE.test(href)) s -= 5;
-      // kurze, „zentrale" Ziele bevorzugen
       try {
         const u = new URL(href, location.href);
         const pathLen = (u.pathname || '/').split('/').filter(Boolean).length;
@@ -689,30 +498,18 @@
       } catch {}
       return s;
     }
-
     clean.sort((a,b) => score(b) - score(a));
     return clean[0] || null;
   }
 
   function goHome(ev){
-    // Klick oder Enter/Space
     if (ev.type === 'keydown' && ev.key !== 'Enter' && ev.key !== ' ') return;
     ev.preventDefault();
-
     const best = pickHomeLink();
-    if (best) {
-      // Simuliere einen echten Klick, damit die SPA/Router-Logik greift
-      best.click();
-      return;
-    }
-
-    // Fallbacks falls kein Link gefunden:
-    // 1) Versuche die aktuelle Basis (z. B. '/prod')
+    if (best) { best.click(); return; }
     const base = location.pathname.split('/').filter(Boolean);
     const rootPath = base.length ? '/' + base[0] + '/' : '/';
     try { location.replace(rootPath); return; } catch {}
-
-    // 2) letzter Notnagel: origin/
     location.replace(location.origin + '/');
   }
 
@@ -826,75 +623,48 @@
 
   function safeClose(){
     const root = findTopContainer() || document.body;
-    if (tryNativeClose(root)) return; // 1) nativer Close
-    clickFirstBackdrop();             // 2) Backdrop-Klick
-    pressEsc();                       // 3) ESC
-    // 4) Bootstrap-Fallback
+    if (tryNativeClose(root)) return;
+    clickFirstBackdrop();
+    pressEsc();
     const bs = isEl(root) ? root.closest?.('.modal.show') : null;
     const anyBs = bs || $('.modal.show');
     if (anyBs) anyBs.classList.remove('show');
   }
 
-  // NEU: schließt auch, wenn außerhalb des Overlay-Containers geklickt wird
   function onPointerDown(e){
     if (!anyOpenOverlay()) return;
-
     const tgt = e.target;
-
-    // 1) direkter Backdrop-Klick
-    if (isEl(tgt) && tgt.matches?.(SEL_BACKDROP)) {
-      safeClose();
-      return;
-    }
-
+    if (isEl(tgt) && tgt.matches?.(SEL_BACKDROP)) { safeClose(); return; }
     const topContainer = findTopContainer();
     if (!topContainer) return;
-
     const contRect  = topContainer.getBoundingClientRect();
     const mediaRect = largestMediaRect(topContainer);
     const x = e.clientX, y = e.clientY;
-
-    // 2) Klick liegt GESAMT außerhalb des Containers → schließen (dein roter Bereich)
-    if (!pointInRect(x, y, contRect, 0)) {
-      safeClose();
-      return;
-    }
-
-    // 3) Event-Pfad prüfen: Klick auf Medienfläche? → nicht schließen
+    if (!pointInRect(x, y, contRect, 0)) { safeClose(); return; }
     const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
     const onSurface = path.some(n => isEl(n) && n.matches?.(SEL_SURFACE));
     if (onSurface) return;
-
-    // 4) innerhalb des Containers, aber außerhalb der größten Medienfläche → schließen
-    //    Margin erhöhen, wenn „nah am Bildrand" noch als „drin" zählen soll (z. B. 8)
-    if (!pointInRect(x, y, mediaRect, 2)) {
-      safeClose();
-    }
+    if (!pointInRect(x, y, mediaRect, 2)) { safeClose(); }
   }
 
-  // früh dran sein: pointerdown + Capture, damit Viewer-Libs nicht blocken
   document.addEventListener('pointerdown', onPointerDown, {capture:true});
   window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') safeClose(); });
 })();
 
-// Sortieren-nach (formcontrolname="sortBy") vollständig ausblenden
+/* ============================================================================
+   WU – Sortieren-nach ausblenden
+   ============================================================================ */
 (function () {
   function hideSortBox(){
-    // 1) das eigentliche Select finden
     const sel = document.querySelector('mat-select[formcontrolname="sortBy"]');
     if (!sel) return;
-
-    // 2) das umgebende Form-Field ausblenden
     const field = sel.closest('mat-form-field, .mat-mdc-form-field');
     if (field) field.style.display = 'none';
-
-    // 3) evtl. Überschrift "Sortieren nach" neben/oberhalb auch verstecken
     const labelCandidates = [
       field?.previousElementSibling,
       field?.parentElement?.querySelector('label, .mat-mdc-form-field-label'),
       field?.parentElement?.firstElementChild
     ].filter(Boolean);
-
     for (const el of labelCandidates) {
       if (/(^|\s)sortieren\s*nach(\s|$)/i.test((el.textContent||'').trim())) {
         el.style.display = 'none';
@@ -907,14 +677,12 @@
     ? document.addEventListener('DOMContentLoaded', hideSortBox)
     : hideSortBox();
 
-  // SPA-Resilienz: bei DOM-Änderungen erneut anwenden
   new MutationObserver(hideSortBox).observe(document.documentElement, { childList:true, subtree:true });
 })();
+
 /* ============================================================================
    WU – "WU Rauminformationstool" im Raumausstattung-Block verlinken
-   - Ersetzt ggf. den reinen Text durch <a>
-   - Falls der Ausdruck nicht vorkommt, wird ein separater Link ergänzt
-   ========================================================================== */
+   ============================================================================ */
 (function () {
   const URL = "https://www.wu.ac.at/universitaet/organisation/dienstleistungseinrichtungen/campusmanagement/veranstaltungsmanagement/raeume-1";
   const RX  = /WU\s+Rauminformationstool/i;
@@ -922,19 +690,14 @@
   function linkifyFeatures() {
     const sections = document.querySelectorAll('.usi-spaceFeatures');
     if (!sections.length) return;
-
     sections.forEach(sec => {
       if (sec.__wuLinked) return;
       sec.__wuLinked = true;
-
-      // 1) Wenn der Ausdruck im HTML/Text vorkommt → per innerHTML ersetzen
       const html = sec.innerHTML;
       if (RX.test(html)) {
         sec.innerHTML = html.replace(RX, `<a href="${URL}" target="_blank" rel="noopener" style="text-decoration:underline; font-weight:600;">WU Rauminformationstool</a>`);
         return;
       }
-
-      // 2) Falls er nicht vorkommt → Extra-Link anhängen
       if (!sec.querySelector('#wu-roominfo-extra-link')) {
         const p = document.createElement('p');
         p.id = 'wu-roominfo-extra-link';
@@ -948,7 +711,6 @@
     ? document.addEventListener('DOMContentLoaded', linkifyFeatures)
     : linkifyFeatures();
 
-  // SPA-Resilienz
   new MutationObserver(linkifyFeatures).observe(document.documentElement, { childList:true, subtree:true });
 })();
 
@@ -960,7 +722,6 @@
   const STYLE_ID = "wu-conditional-required-style";
 
   const CSS = `
-    /* Pflichtfeld-Styling für dynamische Felder */
     .wu-required-dynamic .mdc-text-field--outlined .mdc-notched-outline__leading,
     .wu-required-dynamic .mdc-text-field--outlined .mdc-notched-outline__notch,
     .wu-required-dynamic .mdc-text-field--outlined .mdc-notched-outline__trailing {
@@ -971,7 +732,6 @@
     .wu-required-dynamic .mdc-text-field--outlined:hover .mdc-notched-outline__trailing {
       border-color: #d32f2f !important;
     }
-    /* Fehlermeldung unter dem Feld */
     .wu-validation-error {
       color: #d32f2f;
       font-size: 12px;
@@ -999,30 +759,23 @@
     }
   }
 
-  // Finde Form-Field anhand des Label-Textes (partial match)
   function findFormFieldByLabel(labelText) {
     const allFields = document.querySelectorAll("mat-form-field, .mat-mdc-form-field");
     for (const field of allFields) {
       const label = field.querySelector(".mdc-floating-label, .mat-mdc-floating-label, label");
       if (!label) continue;
       const text = (label.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-      if (text.includes(labelText.toLowerCase())) {
-        return field;
-      }
+      if (text.includes(labelText.toLowerCase())) return field;
     }
     return null;
   }
 
-  // Finde mat-select anhand des Label-Textes
   function findSelectByLabel(labelText) {
     const formField = findFormFieldByLabel(labelText);
-    if (formField) {
-      return formField.querySelector("mat-select");
-    }
+    if (formField) return formField.querySelector("mat-select");
     return null;
   }
 
-  // Prüft ob eine "Ja"-Option gewählt wurde
   function isJaSelected(selectEl) {
     if (!selectEl) return false;
     const valueText = selectEl.querySelector(".mat-mdc-select-value-text, .mat-select-value-text");
@@ -1030,28 +783,21 @@
     return text.startsWith("ja");
   }
 
-  // Prüft ob das Feld einen Wert hat
   function hasValue(formField) {
     if (!formField) return true;
     const input = formField.querySelector("input, textarea");
-    if (input) {
-      return input.value.trim().length > 0;
-    }
+    if (input) return input.value.trim().length > 0;
     return true;
   }
 
-  // Setze Pflichtfeld-Status (nur visuell + Tracking)
   function setRequired(formField, isRequired) {
     if (!formField) return;
-
     const label = formField.querySelector(".mdc-floating-label, .mat-mdc-floating-label, label");
     const input = formField.querySelector("input, textarea");
 
     if (isRequired) {
       formField.classList.add("wu-required-dynamic");
       formField.dataset.wuRequired = "true";
-
-      // Nur Sternchen hinzufügen wenn keins existiert
       if (label) {
         const existingMarker = label.querySelector(".mat-mdc-form-field-required-marker, .wu-required-star");
         const labelText = label.textContent || "";
@@ -1063,138 +809,87 @@
           label.appendChild(star);
         }
       }
-
-      // Fehlermeldung hinzufügen wenn nicht vorhanden
       if (!formField.querySelector(".wu-validation-error")) {
         const errorEl = document.createElement("div");
         errorEl.className = "wu-validation-error";
         errorEl.textContent = "Dieses Feld ist erforderlich";
         formField.appendChild(errorEl);
       }
-
-      // Live-Validierung bei Input
       if (input && !input.dataset.wuValidationBound) {
         input.dataset.wuValidationBound = "true";
         input.addEventListener("input", () => {
-          if (hasValue(formField)) {
-            formField.classList.remove("wu-show-error");
-          }
+          if (hasValue(formField)) formField.classList.remove("wu-show-error");
         });
         input.addEventListener("blur", () => {
-          if (formField.dataset.wuRequired === "true" && !hasValue(formField)) {
+          if (formField.dataset.wuRequired === "true" && !hasValue(formField))
             formField.classList.add("wu-show-error");
-          }
         });
       }
     } else {
       formField.classList.remove("wu-required-dynamic", "wu-show-error");
       formField.dataset.wuRequired = "false";
-
-      // Entferne nur das von uns hinzugefügte Sternchen
       const star = label?.querySelector(".wu-required-star");
       if (star) star.remove();
     }
   }
 
-  // Submit-Validierung
   function setupSubmitValidation() {
-    // Finde alle Submit-Buttons
     const submitButtons = document.querySelectorAll(
       'button[type="submit"], button.mat-primary, button[color="primary"]'
     );
-
     submitButtons.forEach((btn) => {
       if (btn.dataset.wuValidationBound) return;
       btn.dataset.wuValidationBound = "true";
-
-      btn.addEventListener(
-        "click",
-        (e) => {
-          const requiredFields = document.querySelectorAll('[data-wu-required="true"]');
-          let hasErrors = false;
-
-          requiredFields.forEach((field) => {
-            if (!hasValue(field)) {
-              field.classList.add("wu-show-error");
-              hasErrors = true;
-
-              // Scroll zum ersten Fehler
-              if (!hasErrors) {
-                field.scrollIntoView({ behavior: "smooth", block: "center" });
-              }
-            }
-          });
-
-          if (hasErrors) {
-            e.preventDefault();
-            e.stopPropagation();
-
-            // Scroll zum ersten Fehlerfeld
-            const firstError = document.querySelector(".wu-show-error");
-            if (firstError) {
-              firstError.scrollIntoView({ behavior: "smooth", block: "center" });
-              const input = firstError.querySelector("input, textarea");
-              if (input) input.focus();
-            }
-
-            return false;
+      btn.addEventListener("click", (e) => {
+        const requiredFields = document.querySelectorAll('[data-wu-required="true"]');
+        let hasErrors = false;
+        requiredFields.forEach((field) => {
+          if (!hasValue(field)) {
+            field.classList.add("wu-show-error");
+            hasErrors = true;
           }
-        },
-        true
-      ); // capture phase
+        });
+        if (hasErrors) {
+          e.preventDefault();
+          e.stopPropagation();
+          const firstError = document.querySelector(".wu-show-error");
+          if (firstError) {
+            firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+            const input = firstError.querySelector("input, textarea");
+            if (input) input.focus();
+          }
+          return false;
+        }
+      }, true);
     });
   }
 
-  // Überwache Select-Änderungen
   function watchSelect(selectEl, targetField) {
     if (!selectEl || !targetField) return;
-
-    // Initial prüfen
     setRequired(targetField, isJaSelected(selectEl));
-
-    // MutationObserver für Änderungen
     const observer = new MutationObserver(() => {
       setRequired(targetField, isJaSelected(selectEl));
     });
-    observer.observe(selectEl, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-    });
-
-    // Auch auf Overlay-Schließung reagieren (Dropdown)
+    observer.observe(selectEl, { subtree: true, childList: true, characterData: true });
     document.addEventListener("click", (e) => {
       if (e.target.closest(".mat-mdc-option, .mat-option")) {
-        setTimeout(() => {
-          setRequired(targetField, isJaSelected(selectEl));
-        }, 150);
+        setTimeout(() => { setRequired(targetField, isJaSelected(selectEl)); }, 150);
       }
     });
   }
 
-  // Hauptlogik
   function setupConditionalRequired() {
-    // 1) Teilnahmegebühren -> "Wenn ja, in welcher Höhe?"
     const teilnahmeSelect = findSelectByLabel("Erheben Sie Teilnahmegebühren");
     const hoeheField = findFormFieldByLabel("Wenn ja, in welcher Höhe");
+    if (teilnahmeSelect && hoeheField) watchSelect(teilnahmeSelect, hoeheField);
 
-    if (teilnahmeSelect && hoeheField) {
-      watchSelect(teilnahmeSelect, hoeheField);
-    }
-
-    // 2) Kooperationsveranstaltung -> Kooperationspartner
     const koopSelect = findSelectByLabel("Kooperationsveranstaltung");
     const partnerField = findFormFieldByLabel("Kooperationspartner");
+    if (koopSelect && partnerField) watchSelect(koopSelect, partnerField);
 
-    if (koopSelect && partnerField) {
-      watchSelect(koopSelect, partnerField);
-    }
-
-    // Submit-Validierung einrichten
     setupSubmitValidation();
   }
 
-  // Init
   ensureStyle();
 
   function init() {
@@ -1205,7 +900,6 @@
         setupConditionalRequired();
       }
     }, 500);
-
     setTimeout(() => clearInterval(checkInterval), 30000);
   }
 
@@ -1215,14 +909,12 @@
     init();
   }
 
-  // SPA-Resilienz
   let lastUrl = location.href;
   new MutationObserver(() => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
       setTimeout(init, 1000);
     }
-    // Auch Submit-Buttons neu binden bei DOM-Änderungen
     setupSubmitValidation();
   }).observe(document.documentElement, { subtree: true, childList: true });
 })();
