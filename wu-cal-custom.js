@@ -918,3 +918,34 @@
     setupSubmitValidation();
   }).observe(document.documentElement, { subtree: true, childList: true });
 })();
+
+/* ============================================================================
+   WU – "So." (Sonntag) Button in Veranstaltungs-Serie ausblenden
+   ============================================================================ */
+(function () {
+  function hideSonntagButton() {
+    // Alle Toggle-Buttons / Wochentag-Buttons durchsuchen
+    const buttons = document.querySelectorAll('button, mat-button-toggle, .mat-button-toggle');
+    buttons.forEach(btn => {
+      const text = (btn.textContent || "").replace(/\s+/g, "").trim();
+      if (text === "So." || text === "So") {
+        btn.style.display = "none";
+        btn.setAttribute("aria-hidden", "true");
+        // Falls in einem mat-button-toggle-group: auch das Wrapper-Element verstecken
+        const wrapper = btn.closest('mat-button-toggle, .mat-button-toggle');
+        if (wrapper) {
+          wrapper.style.display = "none";
+          wrapper.setAttribute("aria-hidden", "true");
+        }
+      }
+    });
+  }
+
+  (document.readyState === "loading")
+    ? document.addEventListener("DOMContentLoaded", hideSonntagButton)
+    : hideSonntagButton();
+
+  // SPA-Resilienz: bei Tab-Wechsel / DOM-Änderungen erneut anwenden
+  new MutationObserver(hideSonntagButton)
+    .observe(document.documentElement, { childList: true, subtree: true });
+})();
