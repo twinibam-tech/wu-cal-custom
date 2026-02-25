@@ -716,7 +716,7 @@
 
 /* ============================================================================
    WU – Bedingte Pflichtfelder: Teilnahmegebühren & Kooperationsveranstaltung
-   v3: Button wird disabled wenn Pflichtfelder leer sind
+   v4: Bessere Button-Erkennung + Kooperationspartner-Feld Fix
    ============================================================================ */
 (function () {
   const STYLE_ID = "wu-conditional-required-style";
@@ -789,7 +789,8 @@
     if (!selectEl) return false;
     const valueText = selectEl.querySelector(".mat-mdc-select-value-text, .mat-select-value-text");
     const text = (valueText?.textContent || "").trim().toLowerCase();
-    return text.startsWith("ja");
+    // Prüft auf "ja" am Anfang ODER "ja," irgendwo (für "Ja, aber nur mit...")
+    return text.startsWith("ja") || text.includes("ja,");
   }
 
   function hasValue(formField) {
@@ -808,11 +809,36 @@
     return true;
   }
 
+  // Findet den "Zur Übersicht gehen" Button
+  function findSubmitButtons() {
+    // Breiter Selektor für alle möglichen Submit-Buttons
+    const allButtons = document.querySelectorAll('button');
+    const submitBtns = [];
+    
+    allButtons.forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      // "Zur Übersicht gehen" oder andere Submit-artige Buttons
+      if (
+        text.includes("übersicht") ||
+        text.includes("absenden") ||
+        text.includes("speichern") ||
+        text.includes("weiter") ||
+        btn.type === "submit" ||
+        btn.classList.contains("mat-primary") ||
+        btn.getAttribute("color") === "primary" ||
+        btn.classList.contains("mat-flat-button") ||
+        btn.classList.contains("mat-mdc-unelevated-button")
+      ) {
+        submitBtns.push(btn);
+      }
+    });
+    
+    return submitBtns;
+  }
+
   // Aktualisiert den Disabled-Status des Submit-Buttons
   function updateSubmitButtonState() {
-    const submitButtons = document.querySelectorAll(
-      'button[type="submit"], button.mat-primary, button[color="primary"]'
-    );
+    const submitButtons = findSubmitButtons();
     const allFilled = allRequiredFieldsFilled();
     
     submitButtons.forEach((btn) => {
@@ -876,9 +902,7 @@
   }
 
   function setupSubmitValidation() {
-    const submitButtons = document.querySelectorAll(
-      'button[type="submit"], button.mat-primary, button[color="primary"]'
-    );
+    const submitButtons = findSubmitButtons();
     submitButtons.forEach((btn) => {
       if (btn.dataset.wuSubmitTracked) return;
       btn.dataset.wuSubmitTracked = "true";
@@ -925,13 +949,23 @@
   }
 
   function setupConditionalRequired() {
+    // Teilnahmegebühren -> Höhe
     const teilnahmeSelect = findSelectByLabel("Erheben Sie Teilnahmegebühren");
     const hoeheField = findFormFieldByLabel("Wenn ja, in welcher Höhe");
-    if (teilnahmeSelect && hoeheField) watchSelect(teilnahmeSelect, hoeheField);
+    if (teilnahmeSelect && hoeheField) {
+      watchSelect(teilnahmeSelect, hoeheField);
+    }
 
-    const koopSelect = findSelectByLabel("Kooperationsveranstaltung");
-    const partnerField = findFormFieldByLabel("Kooperationspartner");
-    if (koopSelect && partnerField) watchSelect(koopSelect, partnerField);
+    // Kooperationsveranstaltung -> Kooperationspartner
+    // Suche nach verschiedenen möglichen Labels
+    const koopSelect = findSelectByLabel("Kooperationsveranstaltung") || 
+                       findSelectByLabel("Handelt es sich um eine Kooperationsveranstaltung");
+    const partnerField = findFormFieldByLabel("Kooperationspartner") ||
+                         findFormFieldByLabel("Wenn ja, bitte den");
+    
+    if (koopSelect && partnerField) {
+      watchSelect(koopSelect, partnerField);
+    }
 
     setupSubmitValidation();
   }
