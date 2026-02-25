@@ -716,7 +716,7 @@
 
 /* ============================================================================
    WU – Bedingte Pflichtfelder: Teilnahmegebühren & Kooperationsveranstaltung
-   v2: Fix für doppelte Sterne + echte Submit-Validierung
+   v3: Button wird disabled wenn Pflichtfelder leer sind
    ============================================================================ */
 (function () {
   const STYLE_ID = "wu-conditional-required-style";
@@ -747,6 +747,15 @@
     .wu-required-dynamic.wu-show-error .mdc-notched-outline__trailing {
       border-color: #d32f2f !important;
       border-width: 2px !important;
+    }
+    /* Disabled-State für Submit-Button */
+    button.wu-submit-disabled {
+      opacity: 0.5 !important;
+      cursor: not-allowed !important;
+      pointer-events: none !important;
+    }
+    button.wu-submit-disabled:hover {
+      background-color: inherit !important;
     }
   `;
 
@@ -790,6 +799,36 @@
     return true;
   }
 
+  // Prüft ob alle dynamischen Pflichtfelder ausgefüllt sind
+  function allRequiredFieldsFilled() {
+    const requiredFields = document.querySelectorAll('[data-wu-required="true"]');
+    for (const field of requiredFields) {
+      if (!hasValue(field)) return false;
+    }
+    return true;
+  }
+
+  // Aktualisiert den Disabled-Status des Submit-Buttons
+  function updateSubmitButtonState() {
+    const submitButtons = document.querySelectorAll(
+      'button[type="submit"], button.mat-primary, button[color="primary"]'
+    );
+    const allFilled = allRequiredFieldsFilled();
+    
+    submitButtons.forEach((btn) => {
+      // Nur Buttons markieren die wir tracken
+      if (!btn.dataset.wuSubmitTracked) return;
+      
+      if (allFilled) {
+        btn.classList.remove("wu-submit-disabled");
+        btn.removeAttribute("disabled");
+      } else {
+        btn.classList.add("wu-submit-disabled");
+        btn.setAttribute("disabled", "disabled");
+      }
+    });
+  }
+
   function setRequired(formField, isRequired) {
     if (!formField) return;
     const label = formField.querySelector(".mdc-floating-label, .mat-mdc-floating-label, label");
@@ -819,6 +858,7 @@
         input.dataset.wuValidationBound = "true";
         input.addEventListener("input", () => {
           if (hasValue(formField)) formField.classList.remove("wu-show-error");
+          updateSubmitButtonState();
         });
         input.addEventListener("blur", () => {
           if (formField.dataset.wuRequired === "true" && !hasValue(formField))
@@ -831,6 +871,8 @@
       const star = label?.querySelector(".wu-required-star");
       if (star) star.remove();
     }
+    // Button-Status nach jeder Änderung aktualisieren
+    updateSubmitButtonState();
   }
 
   function setupSubmitValidation() {
@@ -838,8 +880,12 @@
       'button[type="submit"], button.mat-primary, button[color="primary"]'
     );
     submitButtons.forEach((btn) => {
-      if (btn.dataset.wuValidationBound) return;
-      btn.dataset.wuValidationBound = "true";
+      if (btn.dataset.wuSubmitTracked) return;
+      btn.dataset.wuSubmitTracked = "true";
+      
+      // Initial Button-Status setzen
+      updateSubmitButtonState();
+      
       btn.addEventListener("click", (e) => {
         const requiredFields = document.querySelectorAll('[data-wu-required="true"]');
         let hasErrors = false;
@@ -916,6 +962,7 @@
       setTimeout(init, 1000);
     }
     setupSubmitValidation();
+    updateSubmitButtonState();
   }).observe(document.documentElement, { subtree: true, childList: true });
 })();
 
